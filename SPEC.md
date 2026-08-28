@@ -15,7 +15,7 @@ one shared, human-like memory.
   (their manual ships ten harnesses and zero memory) using only their public
   extension points.
 - **Not a Mnemo Cortex port.** Mnemo's OS layer (boot, lanes, filing, wiki,
-  user modelling) stays home. Omnemo is the memory 46%, rebuilt clean.
+  user modelling) stays home. Omnemo is just the memory, rebuilt clean.
 - **No cloud, no accounts, no telemetry.** Local-first; the store lives in
   the user's XDG data dir.
 
@@ -35,7 +35,7 @@ omnemo-omarchy  — the glove: skill folder, shell plugin (bar widget),
 ### The memory core (clean-room build)
 
 Built greenfield from this spec under the clean-room rules — no code copied
-from live Mnemo, designed fresh with five months of Mnemo failure data as
+from Mnemo, designed fresh with lessons from Mnemo's production use as
 requirements. Scope: the four memory verbs, ranking, decay. Nothing else.
 
 **Decision — embeddings: LOCAL-FIRST, single path (resolved in review).**
@@ -112,4 +112,4 @@ category's worst failure class; we exclude it by construction.)
 ## Test bed
 
 Omarchy in a VM (or a spare box). Never developed against a live production
-Mnemo install; never tested on a live agent.
+Mnemo install; tested only in disposable environments.
