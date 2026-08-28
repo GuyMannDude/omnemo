@@ -1,6 +1,6 @@
 # Omnemo v0.1 — Spec
 
-*Draft 0.1 — 2026-08-28. Author: CC. Review: Opie. Owner: Guy.*
+*Draft 0.1 — 2026-08-28. Drafted by the build agent; under architect review.*
 
 ## One sentence
 
