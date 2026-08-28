@@ -88,5 +88,5 @@ config. Idempotent; re-run any time. `omnemo disconnect` reverses it.
 
 ## Test bed
 
-Omarchy in a VM on IGOR-2 (or a spare box). Never developed against live
-Mnemo; never touches Rocky.
+Omarchy in a VM (or a spare box). Never developed against a live production
+Mnemo install; never tested on a live agent.
