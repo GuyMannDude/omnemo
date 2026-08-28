@@ -9,9 +9,12 @@ import sys
 from datetime import datetime
 
 from . import __version__
-from .config import load_config, store_path
+from .config import ConfigError, load_config, store_path
 from .embedder import make_embedder
-from .store import EmbedderMismatchError, Store
+from .store import CorruptStoreError, EmbedderMismatchError, Store
+
+# Anything the store/config layer reports as a clean, named error.
+_KNOWN_ERRORS = (ConfigError, CorruptStoreError, EmbedderMismatchError)
 
 
 def _open_store() -> Store:
@@ -45,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_search = sub.add_parser("search", help="search memories by substring")
     p_search.add_argument("query")
-    p_search.add_argument("--limit", "-n", type=int, default=20)
+    p_search.add_argument("--limit", "-n", type=int, default=None)
 
     p_forget = sub.add_parser("forget", help="permanently delete a memory by id")
     p_forget.add_argument("id", type=int)
@@ -59,14 +62,14 @@ def main(argv: list[str] | None = None) -> int:
 
         try:
             serve()
-        except EmbedderMismatchError as e:
+        except _KNOWN_ERRORS as e:
             print(f"error: {e}", file=sys.stderr)
             return 1
         return 0
 
     try:
         store = _open_store()
-    except EmbedderMismatchError as e:
+    except _KNOWN_ERRORS as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 

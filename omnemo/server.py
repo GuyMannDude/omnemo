@@ -4,6 +4,8 @@ save, recall, search, forget.
 
 from __future__ import annotations
 
+import sys
+
 from mcp.server.mcpserver import MCPServer
 
 from . import __version__
@@ -59,7 +61,7 @@ def build_server(store: Store) -> MCPServer:
         name="search",
         description="Search memories by literal substring (case-insensitive).",
     )
-    def search(query: str, limit: int = 20) -> list[dict]:
+    def search(query: str, limit: int | None = None) -> list[dict]:
         return [
             {"id": m.id, "text": m.text, "category": m.category}
             for m in store.search(query, limit)
@@ -83,6 +85,14 @@ def serve() -> None:
     warming the embedder first so the first recall is fast."""
     config = load_config()
     embedder = make_embedder(config.embedder)
-    embedder.warm_up()
+    try:
+        embedder.warm_up()
+    except Exception as exc:
+        print(
+            f"error: embedder {config.embedder!r} failed to load: {exc} "
+            "(first run downloads the model, which needs network access once)",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
     store = Store(store_path(), embedder, config)
     build_server(store).run("stdio")

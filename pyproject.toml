@@ -7,6 +7,7 @@ name = "omnemo"
 version = "0.1.0.dev0"
 description = "Memory-only MCP server: save, recall, search, forget."
 readme = "README.md"
+authors = [{ name = "Guy Hutchins" }]
 license = { text = "MIT" }
 requires-python = ">=3.11"
 dependencies = [
@@ -16,6 +17,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/GuyMannDude/omnemo"
 
 [project.scripts]
 omnemo = "omnemo.cli:main"

@@ -6,9 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from fake_embedder import FakeEmbedder
+
 from omnemo.config import Category, Config
-from omnemo.embedder import FakeEmbedder
-from omnemo.store import EmbedderMismatchError, Store
+from omnemo.store import CorruptStoreError, EmbedderMismatchError, Store
 
 
 def test_save_and_recall(store: Store) -> None:
@@ -126,14 +127,13 @@ def test_recall_survives_removed_category(tmp_path: Path) -> None:
     # recalls (with fallback parameters) instead of crashing.
     path = tmp_path / "s.db"
     with_recipe = Config(
-        embedder="fake",
         categories={**Config().categories, "recipe": Category(0.7, 12.0)},
     )
     store = Store(path, FakeEmbedder(), with_recipe)
     saved = store.save("Sourdough starter needs feeding every morning", "recipe")
     store.close()
 
-    store = Store(path, FakeEmbedder(), Config(embedder="fake"))
+    store = Store(path, FakeEmbedder(), Config())
     try:
         ids = [r.memory.id for r in store.recall("when does the sourdough starter need feeding")]
         assert saved.id in ids
@@ -142,35 +142,89 @@ def test_recall_survives_removed_category(tmp_path: Path) -> None:
 
 
 def test_min_similarity_threshold(tmp_path: Path) -> None:
-    config = Config(embedder="fake", min_similarity=0.99)
-    store = Store(tmp_path / "s.db", FakeEmbedder(), config)
+    # This pair's fake-embedder similarity measures ~0.41 — between the
+    # two thresholds — so the memory is recalled under the lower floor
+    # and filtered by the higher one. (A zero-overlap pair would pass
+    # for any threshold > 0 and prove nothing.)
+    text = "The bicycle tyre pressure gauge lives in the shed drawer"
+    query = "how often does the bicycle tyre need air"
+    path = tmp_path / "s.db"
+
+    low = Store(path, FakeEmbedder(), Config(min_similarity=0.35))
     try:
-        store.save("Entirely unrelated words about quantum marmalade")
-        assert store.recall("bicycle maintenance schedule") == []
+        saved = low.save(text)
+        results = low.recall(query)
+        assert [r.memory.id for r in results] == [saved.id]
+        assert 0.35 < results[0].similarity < 0.45
     finally:
-        store.close()
+        low.close()
+
+    high = Store(path, FakeEmbedder(), Config(min_similarity=0.45))
+    try:
+        assert high.recall(query) == []
+    finally:
+        high.close()
 
 
 def test_embedder_mismatch_refused(tmp_path: Path) -> None:
     path = tmp_path / "store.db"
-    store = Store(path, FakeEmbedder(name="fake:aaa"), Config(embedder="fake"))
+    store = Store(path, FakeEmbedder(name="fake:aaa"), Config())
     store.save("a memory")
     store.close()
 
     with pytest.raises(EmbedderMismatchError, match="fake:aaa"):
-        Store(path, FakeEmbedder(name="fake:bbb"), Config(embedder="fake"))
+        Store(path, FakeEmbedder(name="fake:bbb"), Config())
 
     # Same embedder reopens fine.
-    reopened = Store(path, FakeEmbedder(name="fake:aaa"), Config(embedder="fake"))
+    reopened = Store(path, FakeEmbedder(name="fake:aaa"), Config())
     assert reopened.stats()["memory_count"] == 1
     reopened.close()
 
 
 def test_embedder_dim_mismatch_refused(tmp_path: Path) -> None:
     path = tmp_path / "store.db"
-    Store(path, FakeEmbedder(name="fake:v1", dim=64), Config(embedder="fake")).close()
+    Store(path, FakeEmbedder(name="fake:v1", dim=64), Config()).close()
     with pytest.raises(EmbedderMismatchError, match="dim 64"):
-        Store(path, FakeEmbedder(name="fake:v1", dim=32), Config(embedder="fake"))
+        Store(path, FakeEmbedder(name="fake:v1", dim=32), Config())
+
+
+def test_corrupt_meta_reports_cleanly(tmp_path: Path) -> None:
+    path = tmp_path / "store.db"
+    Store(path, FakeEmbedder(), Config()).close()
+
+    conn = sqlite3.connect(path)
+    conn.execute("DELETE FROM meta WHERE key = 'embedder_dim'")
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(CorruptStoreError, match="embedder_dim"):
+        Store(path, FakeEmbedder(), Config())
+
+
+def test_store_is_private_to_owner(tmp_path: Path) -> None:
+    path = tmp_path / "data" / "store.db"
+    store = Store(path, FakeEmbedder(), Config())
+    try:
+        assert path.parent.stat().st_mode & 0o777 == 0o700
+        assert path.stat().st_mode & 0o777 == 0o600
+    finally:
+        store.close()
+
+    # Pre-existing, too-open directory gets tightened on open.
+    path.parent.chmod(0o755)
+    path.chmod(0o644)
+    store = Store(path, FakeEmbedder(), Config())
+    try:
+        assert path.parent.stat().st_mode & 0o777 == 0o700
+        assert path.stat().st_mode & 0o777 == 0o600
+    finally:
+        store.close()
+
+
+def test_secure_delete_is_on(store: Store) -> None:
+    # Forgotten plaintext must not linger in freelist pages; the SQLite
+    # compile-time default is OFF, so the store must set it explicitly.
+    assert store._conn.execute("PRAGMA secure_delete").fetchone()[0] == 1
 
 
 def test_stats(store: Store) -> None:

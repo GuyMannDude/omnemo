@@ -13,6 +13,7 @@ Schema (see docs/core.md):
 from __future__ import annotations
 
 import math
+import os
 import sqlite3
 import threading
 import time
@@ -21,7 +22,7 @@ from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
 
-from .config import FALLBACK_CATEGORY, Config
+from .config import Category, Config
 from .embedder import Embedder
 
 _SCHEMA = """
@@ -48,6 +49,10 @@ CREATE TABLE IF NOT EXISTS embeddings (
 class EmbedderMismatchError(Exception):
     """The store was created with a different embedder than the one
     configured now. Refusing to mix vector spaces."""
+
+
+class CorruptStoreError(Exception):
+    """The store's metadata is incomplete or unreadable."""
 
 
 @dataclass(frozen=True)
@@ -92,15 +97,23 @@ class Store:
     def __init__(self, path: Path, embedder: Embedder, config: Config) -> None:
         self.embedder = embedder
         self.config = config
-        path.parent.mkdir(parents=True, exist_ok=True)
+        # One human's memory: the store is private to its owner (0700 dir,
+        # 0600 file), whether the directory is fresh or pre-existing.
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(path.parent, 0o700)
         # check_same_thread=False: the MCP SDK runs sync tool functions on
         # worker threads, and concurrent tool calls are possible. self._lock
         # serializes DB access so one verb's transaction can never interleave
         # with another's (e.g. a commit landing between save's two INSERTs).
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(path, check_same_thread=False)
+        os.chmod(path, 0o600)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
+        # Forget must truly forget: overwrite deleted pages with zeroes
+        # rather than leaving plaintext in the freelist. The upstream
+        # compile-time default is OFF, so set it explicitly.
+        self._conn.execute("PRAGMA secure_delete = ON")
         self._conn.executescript(_SCHEMA)
         self._check_embedder()
 
@@ -122,6 +135,13 @@ class Store:
             )
             self._conn.commit()
             return
+        if set(rows) != {"embedder_name", "embedder_dim"}:
+            self._conn.close()
+            missing = {"embedder_name", "embedder_dim"} - set(rows)
+            raise CorruptStoreError(
+                f"store metadata is incomplete (missing {', '.join(sorted(missing))}) "
+                "— the store file appears corrupt"
+            )
         stored = f"{rows['embedder_name']} (dim {rows['embedder_dim']})"
         configured = f"{self.embedder.name} (dim {self.embedder.dim})"
         if stored != configured:
@@ -169,6 +189,10 @@ class Store:
         query_vec = self.embedder.embed([query])[0]
         now = time.time()
 
+        fallback_cat = Category(
+            importance=cfg.fallback_importance,
+            half_life_multiplier=cfg.fallback_half_life_multiplier,
+        )
         with self._lock:
             results: list[RecallResult] = []
             rows = self._conn.execute(
@@ -181,7 +205,7 @@ class Store:
                     continue
                 # Fallback covers memories saved under a category since
                 # removed from config — recall degrades, never crashes.
-                cat = cfg.categories.get(row["category"], FALLBACK_CATEGORY)
+                cat = cfg.categories.get(row["category"], fallback_cat)
                 age_days = max(0.0, now - row["created_at"]) / 86400.0
                 half_life = cfg.base_half_life_days * cat.half_life_multiplier
                 recency = 0.5 ** (age_days / half_life)
@@ -206,9 +230,10 @@ class Store:
             self._conn.commit()
         return results
 
-    def search(self, query: str, limit: int = 20) -> list[Memory]:
+    def search(self, query: str, limit: int | None = None) -> list[Memory]:
         """Literal substring search (case-insensitive). No embedding, and
         no recall-stat updates — this is for browsing, not remembering."""
+        limit = limit if limit is not None else self.config.search_limit
         with self._lock:
             rows = self._conn.execute(
                 "SELECT * FROM memories WHERE text LIKE ? ESCAPE '\\' "

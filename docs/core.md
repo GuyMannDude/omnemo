@@ -7,7 +7,10 @@ API keys — provider keys are never read from the environment.
 ## Storage
 
 SQLite at `$XDG_DATA_HOME/omnemo/store.db` (default
-`~/.local/share/omnemo/store.db`).
+`~/.local/share/omnemo/store.db`). The store is one human's memory: the
+directory is kept at mode 0700 and the database at 0600 (tightened on
+open if a pre-existing directory is looser), and `secure_delete` is ON
+so forgotten rows are zeroed, not left in freelist pages.
 
 ```
 meta        key, value                 -- embedder_name, embedder_dim
@@ -48,12 +51,13 @@ for months.
 
 `$XDG_CONFIG_HOME/omnemo/config.toml` (default
 `~/.config/omnemo/config.toml`). Every key is optional; missing keys use
-the shipped defaults. Nothing here is hard-coded in the ranking path —
-these are the tuning knobs.
+the shipped defaults, and invalid values are rejected at load time with
+an error naming the key. Nothing here is hard-coded in the ranking
+path — these are the tuning knobs.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `embedder` | `"fastembed:BAAI/bge-small-en-v1.5"` | Embedder spec. `"fastembed:<model>"` or `"fake"` (deterministic test embedder, no semantics) |
+| `embedder` | `"fastembed:BAAI/bge-small-en-v1.5"` | Embedder spec: `"fastembed:<model>"` (local ONNX) |
 | `min_similarity` | `0.35` | Cosine floor before a memory can be recalled |
 | `weight_similarity` | `1.0` | Ranking weight: similarity term |
 | `weight_recency` | `0.25` | Ranking weight: recency term |
@@ -63,12 +67,14 @@ these are the tuning knobs.
 | `recall_count_cap` | `10` | Recall counts at/above this saturate the count term |
 | `default_category` | `"fact"` | Category used when `save` gets none |
 | `recall_limit` | `5` | Default max results from `recall` |
+| `search_limit` | `20` | Default max results from `search` |
+| `fallback_importance` | `0.5` | Importance used for memories whose category was removed from config |
+| `fallback_half_life_multiplier` | `1.0` | Half-life multiplier for those same memories |
 
 Categories (each `[categories.<name>]` with `importance`,
 `half_life_multiplier`; overrides merge over these defaults, new
 categories may be added). Memories saved under a category later removed
-from config still recall, using neutral fallback parameters
-(importance 0.5, multiplier 1.0):
+from config still recall, using the `fallback_*` parameters above:
 
 | Category | importance | half_life_multiplier |
 |---|---|---|
