@@ -18,9 +18,10 @@ embeddings  memory_id -> vector (float32 blob), ON DELETE CASCADE
 - **Forget deletes.** `forget` removes the row and its embedding — the
   memory is gone from the store, not hidden or deranked. There is no
   `deleted` flag and no tombstone.
-- **One embedder per store.** `meta` records the embedder that produced
-  the vectors; opening the store with a different embedder raises
-  `EmbedderMismatchError` rather than mixing vector spaces.
+- **One embedder per store.** `meta` records the embedder (name and
+  dimension) that produced the vectors; opening the store with a
+  different one raises `EmbedderMismatchError` rather than mixing
+  vector spaces.
 - `recall` bumps `recall_count` and `last_recalled_at` on the memories it
   returns. `search` (literal substring browse) does not.
 
@@ -65,7 +66,9 @@ these are the tuning knobs.
 
 Categories (each `[categories.<name>]` with `importance`,
 `half_life_multiplier`; overrides merge over these defaults, new
-categories may be added):
+categories may be added). Memories saved under a category later removed
+from config still recall, using neutral fallback parameters
+(importance 0.5, multiplier 1.0):
 
 | Category | importance | half_life_multiplier |
 |---|---|---|

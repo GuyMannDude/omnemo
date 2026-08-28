@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import math
 import sqlite3
+import threading
 import time
 from array import array
 from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
 
-from .config import Config
+from .config import FALLBACK_CATEGORY, Config
 from .embedder import Embedder
 
 _SCHEMA = """
@@ -92,9 +93,11 @@ class Store:
         self.embedder = embedder
         self.config = config
         path.parent.mkdir(parents=True, exist_ok=True)
-        # check_same_thread=False: the MCP SDK runs sync tool functions on a
-        # worker thread. Tool calls are handled one at a time, so a single
-        # connection shared across threads is safe here.
+        # check_same_thread=False: the MCP SDK runs sync tool functions on
+        # worker threads, and concurrent tool calls are possible. self._lock
+        # serializes DB access so one verb's transaction can never interleave
+        # with another's (e.g. a commit landing between save's two INSERTs).
+        self._lock = threading.Lock()
         self._conn = sqlite3.connect(path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
@@ -102,10 +105,13 @@ class Store:
         self._check_embedder()
 
     def _check_embedder(self) -> None:
-        row = self._conn.execute(
-            "SELECT value FROM meta WHERE key = 'embedder_name'"
-        ).fetchone()
-        if row is None:
+        rows = dict(
+            self._conn.execute(
+                "SELECT key, value FROM meta "
+                "WHERE key IN ('embedder_name', 'embedder_dim')"
+            ).fetchall()
+        )
+        if not rows:
             self._conn.execute(
                 "INSERT INTO meta (key, value) VALUES ('embedder_name', ?)",
                 (self.embedder.name,),
@@ -115,12 +121,14 @@ class Store:
                 (str(self.embedder.dim),),
             )
             self._conn.commit()
-        elif row["value"] != self.embedder.name:
-            stored = row["value"]
+            return
+        stored = f"{rows['embedder_name']} (dim {rows['embedder_dim']})"
+        configured = f"{self.embedder.name} (dim {self.embedder.dim})"
+        if stored != configured:
             self._conn.close()
             raise EmbedderMismatchError(
-                f"store was created with embedder {stored!r}, "
-                f"but {self.embedder.name!r} is configured. "
+                f"store was created with embedder {stored}, "
+                f"but {configured} is configured. "
                 "One embedder per store — use the original embedder "
                 "or start a new store."
             )
@@ -137,17 +145,18 @@ class Store:
             raise ValueError(f"unknown category {category!r} (known: {known})")
         vector = self.embedder.embed([text])[0]
         now = time.time()
-        cur = self._conn.execute(
-            "INSERT INTO memories (text, category, created_at) VALUES (?, ?, ?)",
-            (text, category, now),
-        )
-        memory_id = cur.lastrowid
-        assert memory_id is not None
-        self._conn.execute(
-            "INSERT INTO embeddings (memory_id, vector) VALUES (?, ?)",
-            (memory_id, _pack(vector)),
-        )
-        self._conn.commit()
+        with self._lock:
+            cur = self._conn.execute(
+                "INSERT INTO memories (text, category, created_at) VALUES (?, ?, ?)",
+                (text, category, now),
+            )
+            memory_id = cur.lastrowid
+            assert memory_id is not None
+            self._conn.execute(
+                "INSERT INTO embeddings (memory_id, vector) VALUES (?, ?)",
+                (memory_id, _pack(vector)),
+            )
+            self._conn.commit()
         return Memory(memory_id, text, category, now, None, 0)
 
     def recall(self, query: str, limit: int | None = None) -> list[RecallResult]:
@@ -160,70 +169,76 @@ class Store:
         query_vec = self.embedder.embed([query])[0]
         now = time.time()
 
-        results: list[RecallResult] = []
-        rows = self._conn.execute(
-            "SELECT m.*, e.vector FROM memories m "
-            "JOIN embeddings e ON e.memory_id = m.id"
-        ).fetchall()
-        for row in rows:
-            similarity = _cosine(query_vec, _unpack(row["vector"]))
-            if similarity < cfg.min_similarity:
-                continue
-            cat = cfg.categories[row["category"]]
-            age_days = max(0.0, now - row["created_at"]) / 86400.0
-            half_life = cfg.base_half_life_days * cat.half_life_multiplier
-            recency = 0.5 ** (age_days / half_life)
-            count_term = min(row["recall_count"], cfg.recall_count_cap) / cfg.recall_count_cap
-            score = (
-                cfg.weight_similarity * similarity
-                + cfg.weight_recency * recency
-                + cfg.weight_importance * cat.importance
-                + cfg.weight_recall_count * count_term
-            )
-            results.append(RecallResult(_row_to_memory(row), similarity, score))
+        with self._lock:
+            results: list[RecallResult] = []
+            rows = self._conn.execute(
+                "SELECT m.*, e.vector FROM memories m "
+                "JOIN embeddings e ON e.memory_id = m.id"
+            ).fetchall()
+            for row in rows:
+                similarity = _cosine(query_vec, _unpack(row["vector"]))
+                if similarity < cfg.min_similarity:
+                    continue
+                # Fallback covers memories saved under a category since
+                # removed from config — recall degrades, never crashes.
+                cat = cfg.categories.get(row["category"], FALLBACK_CATEGORY)
+                age_days = max(0.0, now - row["created_at"]) / 86400.0
+                half_life = cfg.base_half_life_days * cat.half_life_multiplier
+                recency = 0.5 ** (age_days / half_life)
+                count_term = min(row["recall_count"], cfg.recall_count_cap) / cfg.recall_count_cap
+                score = (
+                    cfg.weight_similarity * similarity
+                    + cfg.weight_recency * recency
+                    + cfg.weight_importance * cat.importance
+                    + cfg.weight_recall_count * count_term
+                )
+                results.append(RecallResult(_row_to_memory(row), similarity, score))
 
-        results.sort(key=lambda r: r.score, reverse=True)
-        results = results[:limit]
+            results.sort(key=lambda r: r.score, reverse=True)
+            results = results[:limit]
 
-        for r in results:
-            self._conn.execute(
-                "UPDATE memories SET last_recalled_at = ?, recall_count = recall_count + 1 "
-                "WHERE id = ?",
-                (now, r.memory.id),
-            )
-        self._conn.commit()
+            for r in results:
+                self._conn.execute(
+                    "UPDATE memories SET last_recalled_at = ?, recall_count = recall_count + 1 "
+                    "WHERE id = ?",
+                    (now, r.memory.id),
+                )
+            self._conn.commit()
         return results
 
     def search(self, query: str, limit: int = 20) -> list[Memory]:
         """Literal substring search (case-insensitive). No embedding, and
         no recall-stat updates — this is for browsing, not remembering."""
-        rows = self._conn.execute(
-            "SELECT * FROM memories WHERE text LIKE ? ESCAPE '\\' "
-            "ORDER BY created_at DESC LIMIT ?",
-            (f"%{_escape_like(query)}%", limit),
-        ).fetchall()
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM memories WHERE text LIKE ? ESCAPE '\\' "
+                "ORDER BY created_at DESC LIMIT ?",
+                (f"%{_escape_like(query)}%", limit),
+            ).fetchall()
         return [_row_to_memory(row) for row in rows]
 
     def forget(self, memory_id: int) -> bool:
         """DELETE the memory and its embedding. Gone from the store,
         not just deranked. Returns False if the id did not exist."""
-        cur = self._conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
-        self._conn.commit()
+        with self._lock:
+            cur = self._conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+            self._conn.commit()
         return cur.rowcount > 0
 
     # -- stats ---------------------------------------------------------
 
     def stats(self) -> dict:
-        count = self._conn.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
         midnight = (
             datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
         )
-        learned_today = self._conn.execute(
-            "SELECT COUNT(*) FROM memories WHERE created_at >= ?", (midnight,)
-        ).fetchone()[0]
-        last = self._conn.execute(
-            "SELECT MAX(last_recalled_at) FROM memories"
-        ).fetchone()[0]
+        with self._lock:
+            count = self._conn.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
+            learned_today = self._conn.execute(
+                "SELECT COUNT(*) FROM memories WHERE created_at >= ?", (midnight,)
+            ).fetchone()[0]
+            last = self._conn.execute(
+                "SELECT MAX(last_recalled_at) FROM memories"
+            ).fetchone()[0]
         return {
             "memory_count": count,
             "learned_today": learned_today,

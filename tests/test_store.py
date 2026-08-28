@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from omnemo.config import Config
+from omnemo.config import Category, Config
 from omnemo.embedder import FakeEmbedder
 from omnemo.store import EmbedderMismatchError, Store
 
@@ -86,21 +86,59 @@ def test_save_rejects_unknown_category(store: Store) -> None:
         store.save("something", category="daydream")
 
 
-def test_ranking_similar_recent_beats_dissimilar_old(store: Store) -> None:
-    old = store.save("The kitchen tap drips when the heating is on")
-    new = store.save("The bicycle tyre needs air every single week")
-
-    # Age the first memory by a year.
+def _age(store: Store, memory_id: int, days: float) -> None:
     store._conn.execute(
         "UPDATE memories SET created_at = ? WHERE id = ?",
-        (time.time() - 365 * 86400, old.id),
+        (time.time() - days * 86400, memory_id),
     )
     store._conn.commit()
 
+
+def test_ranking_similar_recent_beats_dissimilar_old(store: Store) -> None:
+    # Both share enough words with the query to clear min_similarity;
+    # "new" shares more AND is a year fresher, so it must rank first.
+    old = store.save("The bicycle tyre pressure gauge lives in the shed drawer")
+    new = store.save("The bicycle tyre needs air every single week")
+    _age(store, old.id, 365)
+
     results = store.recall("how often does the bicycle tyre need air")
-    assert results[0].memory.id == new.id
-    if len(results) > 1:
-        assert results[0].score > results[1].score
+    assert [r.memory.id for r in results] == [new.id, old.id]
+    assert results[0].score > results[1].score
+
+
+def test_ranking_category_decay_and_importance(store: Store) -> None:
+    # Identical text, identical age: only the category parameters differ.
+    # preference (importance 0.8, half-life x8) must outrank transient
+    # (importance 0.2, half-life x0.25) via both score terms.
+    transient = store.save("The blue mug is in the dishwasher", category="transient")
+    preference = store.save("The blue mug is in the dishwasher", category="preference")
+    _age(store, transient.id, 10)
+    _age(store, preference.id, 10)
+
+    results = store.recall("where is the blue mug")
+    assert [r.memory.id for r in results] == [preference.id, transient.id]
+    assert results[0].similarity == results[1].similarity
+    assert results[0].score > results[1].score
+
+
+def test_recall_survives_removed_category(tmp_path: Path) -> None:
+    # A memory saved under a category later removed from config still
+    # recalls (with fallback parameters) instead of crashing.
+    path = tmp_path / "s.db"
+    with_recipe = Config(
+        embedder="fake",
+        categories={**Config().categories, "recipe": Category(0.7, 12.0)},
+    )
+    store = Store(path, FakeEmbedder(), with_recipe)
+    saved = store.save("Sourdough starter needs feeding every morning", "recipe")
+    store.close()
+
+    store = Store(path, FakeEmbedder(), Config(embedder="fake"))
+    try:
+        ids = [r.memory.id for r in store.recall("when does the sourdough starter need feeding")]
+        assert saved.id in ids
+    finally:
+        store.close()
 
 
 def test_min_similarity_threshold(tmp_path: Path) -> None:
@@ -126,6 +164,13 @@ def test_embedder_mismatch_refused(tmp_path: Path) -> None:
     reopened = Store(path, FakeEmbedder(name="fake:aaa"), Config(embedder="fake"))
     assert reopened.stats()["memory_count"] == 1
     reopened.close()
+
+
+def test_embedder_dim_mismatch_refused(tmp_path: Path) -> None:
+    path = tmp_path / "store.db"
+    Store(path, FakeEmbedder(name="fake:v1", dim=64), Config(embedder="fake")).close()
+    with pytest.raises(EmbedderMismatchError, match="dim 64"):
+        Store(path, FakeEmbedder(name="fake:v1", dim=32), Config(embedder="fake"))
 
 
 def test_stats(store: Store) -> None:

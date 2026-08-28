@@ -57,7 +57,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "serve":
         from .server import serve
 
-        serve()
+        try:
+            serve()
+        except EmbedderMismatchError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
         return 0
 
     try:

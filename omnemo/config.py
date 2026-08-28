@@ -43,6 +43,10 @@ class Category:
     half_life_multiplier: float
 
 
+# Used for memories whose saved category is no longer in the config
+# (removed or renamed): recall keeps working with neutral parameters.
+FALLBACK_CATEGORY = Category(importance=0.5, half_life_multiplier=1.0)
+
 DEFAULT_CATEGORIES: dict[str, Category] = {
     "fact": Category(importance=0.6, half_life_multiplier=4.0),
     "decision": Category(importance=1.0, half_life_multiplier=6.0),
@@ -107,7 +111,7 @@ def load_config(path: Path | None = None) -> Config:
 
     categories = dict(DEFAULT_CATEGORIES)
     for name, params in raw.get("categories", {}).items():
-        base = categories.get(name, Category(importance=0.5, half_life_multiplier=1.0))
+        base = categories.get(name, FALLBACK_CATEGORY)
         categories[name] = Category(
             importance=float(params.get("importance", base.importance)),
             half_life_multiplier=float(

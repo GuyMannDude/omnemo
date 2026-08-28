@@ -51,7 +51,16 @@ class FastEmbedEmbedder:
     @property
     def dim(self) -> int:
         if self._dim is None:
-            self.warm_up()
+            # Known models: read the dimension from fastembed's registry so
+            # opening a store (which checks it) never forces a model load.
+            from fastembed import TextEmbedding
+
+            for entry in TextEmbedding.list_supported_models():
+                if entry["model"] == self._model_name:
+                    self._dim = int(entry["dim"])
+                    break
+            else:
+                self.warm_up()
         assert self._dim is not None
         return self._dim
 
