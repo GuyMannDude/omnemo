@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omnemo"
+version = "0.1.0.dev0"
+description = "Memory-only MCP server: save, recall, search, forget."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=2",
+    "fastembed>=0.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+omnemo = "omnemo.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["omnemo*"]
