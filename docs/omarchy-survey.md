@@ -1,6 +1,6 @@
 # Omarchy 4.0.1 extension-point survey (live VM, 2026-08-28)
 
-Probed on a fresh Omarchy 4.0.1 install (QEMU VM, IGOR `~/omnemo-lab/`).
+Probed on a fresh Omarchy 4.0.1 install in a QEMU/KVM test VM.
 Every claim below was read from the running system, not from docs.
 Re-verify against the target release before each Omnemo release.
 
@@ -44,7 +44,7 @@ and the agent-facing `plugins.md` inside the `omarchy` skill.
   QML file: `BarWidget { moduleName: "<id>" }` importing `qs.Commons`/`qs.Ui`.
 - Enable/inspect: `omarchy plugin list|enable|disable`; layout in
   `~/.config/omarchy/shell.json` (hot-reloads on save).
-- First-party specimens copied to `~/omnemo-lab/omarchy-ref/` (clock,
+- First-party specimens kept in the test-VM workspace (clock,
   tailscale) — pattern source for the Omnemo widget.
 
 ## MCP registration per harness (fresh-box findings)
