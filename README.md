@@ -29,12 +29,28 @@ user plugins, hooks), so it survives every `omarchy update`.
 > Fastest path: open your agent (`omarchy agent`) and say
 > **"Install Omnemo — follow INSTALL.md."** It will do the rest.
 
-Manual instructions: `INSTALL.md` *(coming with v0.1)*.
+Manual instructions: [`INSTALL.md`](./INSTALL.md).
+
+## Prove it
+
+Memory is durable the instant a save returns — a crashing harness loses
+nothing. Don't take our word for it:
+
+```sh
+python3 examples/crash_demo.py
+```
+
+It opens a real MCP session against `omnemo serve`, saves a memory, SIGKILLs
+the server the moment the save is acknowledged (no shutdown, no flush), then
+recalls the memory from a fresh process.
 
 ## Status
 
-**Spec stage.** See [`SPEC.md`](./SPEC.md) for the v0.1 design. Watch this
-repo — first release is in the works.
+**v0.1 glove, proven on a clean Omarchy 4.0.1 box.** Fresh install to green
+in minutes: MCP registered with every shipping harness (verified read-back,
+not just name-matched), skill linked, bar widget live — and everything
+survives `omarchy update`, harness upgrades, theme switches, and a shell
+restart with zero re-setup. See [`SPEC.md`](./SPEC.md) for the design.
 
 ## Lineage
 
