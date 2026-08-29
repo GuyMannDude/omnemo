@@ -33,16 +33,27 @@ SERVER_COMMAND = ["omnemo", "serve"]
 Runner = Callable[[list[str]], tuple[int, str]]
 
 
-def _default_runner(argv: list[str]) -> tuple[int, str]:
-    try:
-        proc = subprocess.run(
-            argv, capture_output=True, text=True, timeout=60
-        )
-    except FileNotFoundError:
-        return 127, f"{argv[0]}: not found"
-    except subprocess.TimeoutExpired:
-        return 124, f"{argv[0]}: timed out"
-    return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+def _make_default_runner(home: Path) -> Runner:
+    """Subprocesses inherit `home` as HOME so harness CLIs that resolve
+    their config from the environment operate on the same root as the
+    file adapters — `connect_all(home=X)` must mean X for every adapter."""
+
+    env = dict(os.environ)
+    env["HOME"] = str(home)
+    env["XDG_CONFIG_HOME"] = str(home / ".config")
+
+    def run(argv: list[str]) -> tuple[int, str]:
+        try:
+            proc = subprocess.run(
+                argv, capture_output=True, text=True, timeout=60, env=env
+            )
+        except FileNotFoundError:
+            return 127, f"{argv[0]}: not found"
+        except subprocess.TimeoutExpired:
+            return 124, f"{argv[0]}: timed out"
+        return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+
+    return run
 
 
 @dataclass
@@ -75,9 +86,24 @@ def _merge_json_key(path: Path, keys: list[str], value: dict) -> None:
         node = nxt
     node[keys[-1]] = value
     path.parent.mkdir(parents=True, exist_ok=True)
+    _write_json_atomic(path, data)
+
+
+def _write_json_atomic(path: Path, data: dict) -> None:
+    """Atomic replace that PRESERVES the file's permission bits. These
+    configs routinely hold API keys; a fresh temp file under the umask
+    would silently widen a user's deliberate 0600 to world-readable."""
+    mode = path.stat().st_mode & 0o777 if path.exists() else 0o600
     tmp = path.with_suffix(path.suffix + ".omnemo-tmp")
-    tmp.write_text(json.dumps(data, indent=2) + "\n")
-    os.replace(tmp, path)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(json.dumps(data, indent=2) + "\n")
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def _read_json_key(path: Path, keys: list[str]):
@@ -103,9 +129,7 @@ def _remove_json_key(path: Path, keys: list[str]) -> bool:
     if keys[-1] not in node:
         return False
     del node[keys[-1]]
-    tmp = path.with_suffix(path.suffix + ".omnemo-tmp")
-    tmp.write_text(json.dumps(data, indent=2) + "\n")
-    os.replace(tmp, path)
+    _write_json_atomic(path, data)
     return True
 
 
@@ -116,7 +140,7 @@ class Harness:
 
     def __init__(self, home: Path | None = None, runner: Runner | None = None):
         self.home = home or Path.home()
-        self.run = runner or _default_runner
+        self.run = runner or _make_default_runner(self.home)
 
     def detected(self) -> bool:
         return shutil.which(self.name) is not None
@@ -133,44 +157,81 @@ class _CliHarness(Harness):
 
     add_argv: list[str] = []
     list_argv: list[str] = []
+    get_argv: list[str] = []
     remove_argv: list[str] = []
 
-    def _registered(self) -> bool | None:
-        """True/False from `mcp list` read-back; None if the CLI failed."""
+    def _registration(self) -> str:
+        """Four states from the harness's own read surface:
+        'unknown' — the CLI failed, we know nothing;
+        'absent'  — not registered;
+        'ok'      — registered with OUR command;
+        'stale'   — registered, but pointing at something else.
+        Both `claude mcp get` and `codex mcp get` print command and args
+        (verified live, docs/omarchy-survey.md)."""
         code, out = self.run(self.list_argv)
         if code != 0:
-            return None
-        return SERVER_NAME in out
+            return "unknown"
+        if SERVER_NAME not in out:
+            return "absent"
+        code, out = self.run(self.get_argv)
+        if code != 0:
+            return "unknown"
+        low = out.lower()
+        cmd, args = SERVER_COMMAND[0], " ".join(SERVER_COMMAND[1:])
+        if f"command: {cmd}" in low and f"args: {args}" in low:
+            return "ok"
+        return "stale"
 
     def connect(self) -> HarnessResult:
-        if self._registered() is True:
+        state = self._registration()
+        if state == "unknown":
+            return HarnessResult(
+                self.name, "failed", "could not read current registration"
+            )
+        if state == "ok":
             return HarnessResult(self.name, "already")
+        replaced = False
+        if state == "stale":
+            # Wrong command registered under our name: repair, don't trust.
+            code, out = self.run(self.remove_argv)
+            if code != 0:
+                return HarnessResult(
+                    self.name, "failed",
+                    f"stale entry, remove exited {code}: {out.strip()[:200]}",
+                )
+            replaced = True
         code, out = self.run(self.add_argv)
         if code != 0:
             return HarnessResult(
                 self.name, "failed", f"add exited {code}: {out.strip()[:200]}"
             )
         # Read-back: the registration must be visible to the harness itself.
-        seen = self._registered()
-        if seen is not True:
+        if self._registration() != "ok":
             return HarnessResult(
                 self.name,
                 "failed",
                 "add succeeded but read-back could not see the server",
             )
-        return HarnessResult(self.name, "registered")
+        detail = "stale entry replaced" if replaced else ""
+        return HarnessResult(self.name, "registered", detail)
 
     def disconnect(self) -> HarnessResult:
-        if self._registered() is not True:
+        state = self._registration()
+        if state == "unknown":
+            return HarnessResult(
+                self.name, "failed", "could not read current registration"
+            )
+        if state == "absent":
             return HarnessResult(self.name, "skipped", "was not registered")
         code, out = self.run(self.remove_argv)
         if code != 0:
             return HarnessResult(
                 self.name, "failed", f"remove exited {code}: {out.strip()[:200]}"
             )
-        if self._registered() is True:
+        if self._registration() != "absent":
             return HarnessResult(
-                self.name, "failed", "remove succeeded but server still listed"
+                self.name, "failed",
+                "remove ran but read-back could not confirm it is gone",
             )
         return HarnessResult(self.name, "removed")
 
@@ -180,6 +241,7 @@ class ClaudeHarness(_CliHarness):
     add_argv = ["claude", "mcp", "add", "--scope", "user",
                 SERVER_NAME, "--"] + SERVER_COMMAND
     list_argv = ["claude", "mcp", "list"]
+    get_argv = ["claude", "mcp", "get", SERVER_NAME]
     remove_argv = ["claude", "mcp", "remove", "--scope", "user", SERVER_NAME]
 
 
@@ -187,6 +249,7 @@ class CodexHarness(_CliHarness):
     name = "codex"
     add_argv = ["codex", "mcp", "add", SERVER_NAME, "--"] + SERVER_COMMAND
     list_argv = ["codex", "mcp", "list"]
+    get_argv = ["codex", "mcp", "get", SERVER_NAME]
     remove_argv = ["codex", "mcp", "remove", SERVER_NAME]
 
 

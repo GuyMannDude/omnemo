@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Review hardening (independent review of the glove, 2026-08-28): JSON
+  config rewrites now preserve the file's permission bits (a fresh temp
+  file under the umask silently widened a user's 0600 key-bearing config
+  to world-readable) and the temp copy is created 0600; CLI-adapter
+  read-back is four-state (unknown/absent/ok/stale) — a broken harness
+  CLI now fails disconnect instead of claiming "was not registered", and
+  a registration under our name pointing at the wrong binary is repaired
+  (remove + re-add) instead of reported "already"; harness subprocesses
+  run with HOME/XDG_CONFIG_HOME set from the adapter's `home` so every
+  adapter operates on the same root; bar widget hedges PATH for
+  `~/.local/bin`; 13 new tests cover these plus setup/disconnect sweeps
+  and the CLI exit-code contract.
+
 - The Omarchy glove, first cut: `omnemo setup` installs the memory skill
   (copied to `~/.local/share/omnemo/skill/`, symlinked per harness dir —
   the live-box survey falsified the assumed propagation loop), the

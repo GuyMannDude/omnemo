@@ -38,14 +38,7 @@ UNIT_NAME = "omnemo-warm.service"
 
 def _copy_asset_tree(asset: str, dest: Path) -> None:
     """Copy a packaged asset directory onto dest (overwrite, no deletes)."""
-    src = resources.files("omnemo.omarchy") / "assets" / asset
-    dest.mkdir(parents=True, exist_ok=True)
-    for entry in src.iterdir():
-        target = dest / entry.name
-        if entry.is_dir():
-            _copy_entry_tree(entry, target)
-        else:
-            target.write_bytes(entry.read_bytes())
+    _copy_entry_tree(resources.files("omnemo.omarchy") / "assets" / asset, dest)
 
 
 def _copy_entry_tree(src, dest: Path) -> None:

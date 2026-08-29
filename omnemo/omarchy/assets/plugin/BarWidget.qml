@@ -43,7 +43,8 @@ BarWidget {
 
   Process {
     id: statsProcess
-    command: ["omnemo", "stats", "--json"]
+    // pipx puts omnemo in ~/.local/bin; the shell's PATH may not include it.
+    command: ["/bin/sh", "-c", "PATH=\"$HOME/.local/bin:$PATH\" exec omnemo stats --json"]
     stdout: StdioCollector {
       onStreamFinished: root.applyStats(text)
     }
