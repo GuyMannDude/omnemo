@@ -1,0 +1,11 @@
+[Unit]
+Description=Omnemo embedder warm-up (pre-loads the local embedding model)
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/omnemo warm
+# The model download on first ever run can take a while; be patient once.
+TimeoutStartSec=600
+
+[Install]
+WantedBy=default.target

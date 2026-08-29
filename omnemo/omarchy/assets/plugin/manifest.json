@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "omnemo.memory",
+  "name": "Omnemo Memory",
+  "version": "0.1.0",
+  "author": "Omnemo",
+  "description": "What your machine remembered: memory count and today's learning",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Omnemo Memory",
+    "description": "Memory count · learned today, from the shared agent memory store",
+    "category": "System",
+    "allowMultiple": false
+  }
+}

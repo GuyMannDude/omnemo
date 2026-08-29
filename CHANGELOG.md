@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- The Omarchy glove, first cut: `omnemo setup` installs the memory skill
+  (copied to `~/.local/share/omnemo/skill/`, symlinked per harness dir —
+  the live-box survey falsified the assumed propagation loop), the
+  Quickshell bar widget (`omnemo.memory`, count + learned-today via
+  `omnemo stats --json`), a boot warm-up user unit, and MCP registration
+  for claude/codex (their own `mcp add`, read back via `mcp list`) and
+  opencode/crush/gemini (atomic JSON config merge, read back from disk);
+  pi is skill-only until its MCP surface is verified. `omnemo connect` /
+  `disconnect [--all-pieces]` run the registration half alone. New core
+  verbs: `stats --json`, `warm`. INSTALL.md (dual-audience) and
+  `docs/omarchy-survey.md` (live 4.0.1 findings) added; per-adapter and
+  glove test suites (38 new tests).
+
 - Hardening from independent review: config values validated at load time
   (clean errors, no tracebacks from hand-edited TOML), store private to its
   owner (0700/0600, tightened on open), `secure_delete` ON so forgotten rows

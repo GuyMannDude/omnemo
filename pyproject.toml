@@ -26,3 +26,6 @@ omnemo = "omnemo.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["omnemo*"]
+
+[tool.setuptools.package-data]
+"omnemo.omarchy" = ["assets/**/*"]

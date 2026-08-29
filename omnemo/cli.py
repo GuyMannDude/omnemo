@@ -53,9 +53,58 @@ def main(argv: list[str] | None = None) -> int:
     p_forget = sub.add_parser("forget", help="permanently delete a memory by id")
     p_forget.add_argument("id", type=int)
 
-    sub.add_parser("stats", help="memory count, learned today, last recall")
+    p_stats = sub.add_parser(
+        "stats", help="memory count, learned today, last recall"
+    )
+    p_stats.add_argument("--json", action="store_true", dest="as_json")
+
+    sub.add_parser("warm", help="pre-load the embedder (boot warm-up)")
+
+    sub.add_parser(
+        "setup",
+        help="install the Omarchy glove: skill, bar plugin, warm-up, connect",
+    )
+    sub.add_parser("connect", help="register the MCP server with every harness")
+    p_disc = sub.add_parser("disconnect", help="unregister from every harness")
+    p_disc.add_argument(
+        "--all-pieces", action="store_true",
+        help="also remove skill links, bar plugin, and warm-up unit",
+    )
 
     args = parser.parse_args(argv)
+
+    if args.command in ("setup", "connect", "disconnect"):
+        from .omarchy import glove
+        from .omarchy.harnesses import connect_all, disconnect_all
+
+        if args.command == "setup":
+            lines, results = glove.setup()
+        elif args.command == "connect":
+            lines, results = [], connect_all()
+        elif getattr(args, "all_pieces", False):
+            lines, results = glove.teardown()
+        else:
+            lines, results = [], disconnect_all()
+        for line in lines:
+            print(line)
+        failed = False
+        for r in results:
+            mark = "ok " if r.ok else "FAIL"
+            detail = f" — {r.detail}" if r.detail else ""
+            print(f"[{mark}] {r.harness}: {r.action}{detail}")
+            failed = failed or not r.ok
+        return 1 if failed else 0
+
+    if args.command == "warm":
+        try:
+            config = load_config()
+            embedder = make_embedder(config.embedder)
+            embedder.embed(["omnemo warm-up"])
+        except _KNOWN_ERRORS as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        print("embedder warm")
+        return 0
 
     if args.command == "serve":
         from .server import serve
@@ -108,9 +157,14 @@ def main(argv: list[str] | None = None) -> int:
 
         elif args.command == "stats":
             s = store.stats()
-            print(f"memories:      {s['memory_count']}")
-            print(f"learned today: {s['learned_today']}")
-            print(f"last recall:   {_fmt_time(s['last_recall_at'])}")
+            if args.as_json:
+                import json
+
+                print(json.dumps(s))
+            else:
+                print(f"memories:      {s['memory_count']}")
+                print(f"learned today: {s['learned_today']}")
+                print(f"last recall:   {_fmt_time(s['last_recall_at'])}")
     finally:
         store.close()
 
