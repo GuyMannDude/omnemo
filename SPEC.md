@@ -57,8 +57,8 @@ never hard-coded constants — tuned on real recall data after release
 
 | Piece | Omarchy mechanism | What it does |
 |---|---|---|
-| Memory skill | `~/.agents/skills/omnemo/` (their symlink loop feeds all five harness skill dirs) | Teaches every harness when to save and when to recall — **conservative by default**: save decisions, lessons, durable facts, things that change a future answer; skip transient state, one-off mentions, anything re-derivable. Ships with explicit do-NOT-save examples — negative examples do the real work; over-saving is the #1 recall killer |
-| Bar widget | User shell plugin in `~/.config/omarchy/plugins/` (hot-reload, survives updates) | Memory count · last recall · "learned today" |
+| Memory skill | `ln -sfn` into each harness skill dir (`~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills`, `~/.pi/agent/skills`) — Omarchy's own per-dir idiom; **there is no automatic propagation loop** (falsified on the live box, see `docs/omarchy-survey.md`) | Teaches every harness when to save and when to recall — **conservative by default**: save decisions, lessons, durable facts, things that change a future answer; skip transient state, one-off mentions, anything re-derivable. Ships with explicit do-NOT-save examples — negative examples do the real work; over-saving is the #1 recall killer |
+| Bar widget | Quickshell (QML) plugin in `~/.config/omarchy/plugins/omnemo.memory/` — `manifest.json` + `BarWidget.qml`, hot-reload, survives updates (the bar is `omarchy-shell`/Quickshell, **not waybar** — see survey) | Memory count · last recall · "learned today" |
 | Boot + service | systemd user unit + `post-boot.d` hook | Server always up, embedder pre-warmed; optional morning digest — **stats only** (memory count, learned-today, last recall) straight from the store, no LLM pass. Synthesis/"dreaming" is deliberately out until v0.2+, as opt-in |
 | Crash memory | Their `omarchy-agent-crash` → skill pattern | Skill addendum: recall prior crashes of the same binary before diagnosing |
 
