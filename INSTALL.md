@@ -8,6 +8,14 @@ Requires: Omarchy 2.0+ (surveyed against 4.0.1), Python 3.11+.
 
 ## 1. Install the package
 
+Fresh Omarchy ships without pipx; install it first:
+
+```bash
+sudo pacman -Syu --needed python-pipx
+```
+
+Then:
+
 ```bash
 pipx install omnemo
 ```
@@ -65,12 +73,16 @@ same answer, same store.
 
 ## 5. Show the bar widget (optional)
 
-The widget installs enabled but the bar only shows widgets in its layout.
-Add it:
+Third-party plugins are discovered but land **disabled** — enable ours,
+then place it:
 
 ```bash
+omarchy plugin enable omnemo.memory
 omarchy bar move omnemo.memory --section right
 ```
+
+(Run these inside the graphical session — they talk to the running
+`omarchy-shell`.)
 
 **Check:** the bar shows `𝍇 N` (your memory count). It refreshes every
 minute; click it to refresh now.
