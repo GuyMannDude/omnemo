@@ -44,6 +44,34 @@ It opens a real MCP session against `omnemo serve`, saves a memory, SIGKILLs
 the server the moment the save is acknowledged (no shutdown, no flush), then
 recalls the memory from a fresh process.
 
+### Cross-harness recall, live
+
+The core promise — save in one harness, recall in any — is a two-command
+demo on a box with two authenticated harnesses:
+
+```sh
+# Ask Claude Code (Anthropic) to remember something
+claude -p 'Use the omnemo save tool to store this memory: the electronics
+repair shop favorite song was "Everything'\''s Broken" by Bob Dylan' \
+  --allowedTools "mcp__omnemo__save"
+
+# Ask Codex (OpenAI) — a different vendor's harness, fresh process
+codex exec 'Using only the omnemo MCP recall tool: what was the favorite
+song at the electronics repair shop?'
+```
+
+Run live on the reference Omarchy 4.0.1 box:
+
+```
+mcp: omnemo/recall started
+mcp: omnemo/recall (completed)
+codex
+"Everything's Broken" by Bob Dylan.
+```
+
+One memory, written by one vendor's agent, recalled by its competitor.
+The memory belongs to the machine, not the harness.
+
 ## Status
 
 **v0.1 glove, proven on a clean Omarchy 4.0.1 box.** Fresh install to green
