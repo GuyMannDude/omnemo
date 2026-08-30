@@ -20,7 +20,7 @@ Then:
 pipx install omnemo
 ```
 
-Until the first PyPI release, install from the repo instead:
+Or, for the latest development version, straight from the repo:
 
 ```bash
 pipx install git+https://github.com/GuyMannDude/omnemo
