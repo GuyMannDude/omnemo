@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "omnemo"
-version = "0.1.0.dev0"
+version = "0.1.1"
 description = "Memory-only MCP server: save, recall, search, forget."
 readme = "README.md"
 authors = [{ name = "Guy Hutchins" }]

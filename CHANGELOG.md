@@ -1,6 +1,19 @@
 # Omnemo Changelog
 
-## Unreleased
+## 0.1.1 — 2026-08-30
+
+- Fix: `omnemo --version` (and the MCP server's advertised version) reported
+  the stale hardcoded `0.1.0.dev0` on the released 0.1.0 — the version lived
+  in two places and only one was bumped at release. `__version__` now reads
+  from installed package metadata, so pyproject is the single source.
+
+## 0.1.0 — 2026-08-30
+
+First public release, on PyPI as `omnemo`. Everything below shipped in it,
+capped by the live cross-harness proof: a memory saved by Claude Code
+(Anthropic) recalled by Codex (OpenAI) through `omnemo/recall` on the
+reference Omarchy 4.0.1 box — the problem (harness-local memory) fixed
+by one shared store.
 
 - Review hardening (independent review of the glove, 2026-08-28): JSON
   config rewrites now preserve the file's permission bits (a fresh temp
