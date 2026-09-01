@@ -70,7 +70,7 @@ and Catppuccin Latte themes side by side.)*
   system citizen."
 - Hook (flavor): **"Agents come and go. The memory abides."** Keep the riff
   to this line; don't quote "The Dude" by name in official copy.
-- Claim discipline: cross-harness recall is PROVEN on Claude Code + Codex
+- Claim discipline: cross-harness recall is PROVEN on Claude Code + Codex + opencode (via OpenRouter/Haiku)
   (live demo in README). For the rest say "every agent CLI Omarchy ships" —
   registration is built for all of them, but don't claim per-harness demos we
   haven't run.
