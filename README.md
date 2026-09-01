@@ -1,5 +1,7 @@
 # Omnemo — memory for Omarchy
 
+> *Agents come and go. The memory abides.*
+
 **One shared memory for every agent harness on the box.**
 
 Omarchy made coding agents system citizens. Omnemo gives them the one thing
