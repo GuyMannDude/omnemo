@@ -56,6 +56,11 @@ First watchers, each individually opt-in:
 
 - **Agent-to-agent messaging (a bus)** — needs a multi-agent household to
   be worth its weight; demand-gated on real users asking for handoff.
+  Design principle already fixed (2026-08-31): the bus core is LOCAL-FIRST
+  (on-box store + HTTP, works offline); chat services (Discord etc.) are
+  optional *mirrors* for human visibility, never the transport. Omarchy
+  itself ships no Discord integration — its Discord is a support community
+  only (verified in source).
 - **Task board / lanes / supervision** — same gate.
 
 ## Design rules
