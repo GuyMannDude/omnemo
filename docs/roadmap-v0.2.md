@@ -52,6 +52,22 @@ First watchers, each individually opt-in:
 - **security** — advisories touching installed harnesses/runtimes
   (scope carefully; start with version-lag, not CVE feeds).
 
+## Found by the proving ground (2026-09-04) — candidate for v0.2
+
+**Truth changes are invisible to recall.** The Memory Proving Ground's
+S02 scenario saves "X is alive", then "X is decommissioned", and asks
+"is X alive?". omnemo serves the STALE sentence as the top hit — with
+real nomic embeddings, not just the test fake. Three reasons, all
+structural: no supersede (a new memory cannot demote an old one), no
+write-time near-duplicate signal (the second save lands silently), and
+recency at day granularity cannot separate two saves minutes apart.
+Cheapest honest fix, in order of weight: (1) `save` returns
+`near_duplicates` when a stored memory is above a cosine gate — the
+caller learns there is an older claim; (2) optional `supersedes=[id]` on
+`save` that marks the old one so recall never serves it first. Both are
+opt-in and leave core save/recall untouched. Numbers + fixture:
+`memory-proving-ground/results/s02_truth_changes__omnemo__none.json`.
+
 ## Explicitly NOT in v0.2
 
 - **Agent-to-agent messaging (a bus)** — needs a multi-agent household to
