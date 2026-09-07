@@ -5,7 +5,11 @@ Schema (see docs/core.md):
                dimension so a store is never opened under a different
                embedder (mixed vector spaces silently break recall).
   memories   — id, text, category, created_at, last_recalled_at,
-               recall_count. Forget DELETEs the row — no tombstones.
+               recall_count, superseded_by. Forget DELETEs the row — no
+               tombstones. superseded_by names the newer memory that
+               replaced this one (recall skips it; search still shows it);
+               forgetting the newer memory clears it, so the old claim
+               comes back rather than vanishing.
   embeddings — one vector per memory, keyed by memory id, deleted by
                cascade when the memory is forgotten.
 """
@@ -36,7 +40,8 @@ CREATE TABLE IF NOT EXISTS memories (
     category         TEXT NOT NULL,
     created_at       REAL NOT NULL,
     last_recalled_at REAL,
-    recall_count     INTEGER NOT NULL DEFAULT 0
+    recall_count     INTEGER NOT NULL DEFAULT 0,
+    superseded_by    INTEGER REFERENCES memories(id) ON DELETE SET NULL
 );
 CREATE TABLE IF NOT EXISTS embeddings (
     memory_id INTEGER PRIMARY KEY
@@ -63,6 +68,30 @@ class Memory:
     created_at: float
     last_recalled_at: float | None
     recall_count: int
+    superseded_by: int | None = None
+
+
+@dataclass(frozen=True)
+class NearDuplicate:
+    memory: Memory
+    similarity: float
+
+
+@dataclass(frozen=True)
+class SaveResult:
+    """What `save` returns: the stored memory plus any live memories whose
+    vectors sit above `near_duplicate_similarity` — the caller learns an
+    older claim exists. The write always lands; nothing is held."""
+
+    memory: Memory
+    near_duplicates: list[NearDuplicate]
+
+    # Every Memory field reads through (`store.save(...).id`, `.created_at`,
+    # ...) so 0.1.x callers keep working; `.memory` is the row itself.
+    def __getattr__(self, name: str):
+        if name.startswith("_") or name in ("memory", "near_duplicates"):
+            raise AttributeError(name)
+        return getattr(self.memory, name)
 
 
 @dataclass(frozen=True)
@@ -115,7 +144,19 @@ class Store:
         # compile-time default is OFF, so set it explicitly.
         self._conn.execute("PRAGMA secure_delete = ON")
         self._conn.executescript(_SCHEMA)
+        self._migrate()
         self._check_embedder()
+
+    def _migrate(self) -> None:
+        # Stores created before 0.2.0 lack superseded_by. ADD COLUMN with a
+        # NULL default is safe on a live table and idempotent via this check.
+        cols = {row["name"] for row in self._conn.execute("PRAGMA table_info(memories)")}
+        if "superseded_by" not in cols:
+            self._conn.execute(
+                "ALTER TABLE memories ADD COLUMN superseded_by INTEGER "
+                "REFERENCES memories(id) ON DELETE SET NULL"
+            )
+            self._conn.commit()
 
     def _check_embedder(self) -> None:
         rows = dict(
@@ -158,14 +199,44 @@ class Store:
 
     # -- the four verbs ------------------------------------------------
 
-    def save(self, text: str, category: str | None = None) -> Memory:
+    def save(
+        self,
+        text: str,
+        category: str | None = None,
+        supersedes: list[int] | None = None,
+    ) -> SaveResult:
+        """Store one memory. Returns the memory plus near-duplicates among
+        live (non-superseded) memories. `supersedes` marks those ids as
+        replaced by this one in the same transaction; unknown ids raise
+        ValueError and nothing is written."""
         category = category or self.config.default_category
         if category not in self.config.categories:
             known = ", ".join(sorted(self.config.categories))
             raise ValueError(f"unknown category {category!r} (known: {known})")
+        supersedes = _int_ids(supersedes)
         vector = self.embedder.embed([text])[0]
         now = time.time()
         with self._lock:
+            if supersedes:
+                placeholders = ",".join("?" * len(supersedes))
+                rows = self._conn.execute(
+                    f"SELECT id, superseded_by FROM memories WHERE id IN ({placeholders})",
+                    supersedes,
+                ).fetchall()
+                found = {row["id"]: row["superseded_by"] for row in rows}
+                missing = sorted(set(supersedes) - set(found))
+                if missing:
+                    raise ValueError(f"cannot supersede unknown memory id(s): {missing}")
+                # A retired memory keeps its first superseder: re-pointing it
+                # would let forget() of the second one resurrect the stale claim
+                # beside the memory that already replaced it.
+                retired = sorted(i for i, by in found.items() if by is not None)
+                if retired:
+                    raise ValueError(
+                        f"memory id(s) already superseded: {retired} "
+                        "(supersede the live memory that replaced them instead)"
+                    )
+            near = self._near_duplicates(vector)
             cur = self._conn.execute(
                 "INSERT INTO memories (text, category, created_at) VALUES (?, ?, ?)",
                 (text, category, now),
@@ -176,8 +247,34 @@ class Store:
                 "INSERT INTO embeddings (memory_id, vector) VALUES (?, ?)",
                 (memory_id, _pack(vector)),
             )
+            if supersedes:
+                placeholders = ",".join("?" * len(supersedes))
+                self._conn.execute(
+                    f"UPDATE memories SET superseded_by = ? WHERE id IN ({placeholders})",
+                    [memory_id, *supersedes],
+                )
             self._conn.commit()
-        return Memory(memory_id, text, category, now, None, 0)
+        return SaveResult(Memory(memory_id, text, category, now, None, 0), near)
+
+    def _near_duplicates(self, vector: list[float]) -> list[NearDuplicate]:
+        """Live memories whose cosine to `vector` is at or above the gate.
+        Caller holds the lock. A limit of 0 turns the scan off entirely —
+        it is a full pass over every live vector, the same cost as a recall."""
+        cfg = self.config
+        if cfg.near_duplicate_limit == 0:
+            return []
+        rows = self._conn.execute(
+            "SELECT m.*, e.vector FROM memories m "
+            "JOIN embeddings e ON e.memory_id = m.id "
+            "WHERE m.superseded_by IS NULL"
+        ).fetchall()
+        near = [
+            NearDuplicate(_row_to_memory(row), sim)
+            for row in rows
+            if (sim := _cosine(vector, _unpack(row["vector"]))) >= cfg.near_duplicate_similarity
+        ]
+        near.sort(key=lambda n: n.similarity, reverse=True)
+        return near[: cfg.near_duplicate_limit]
 
     def recall(self, query: str, limit: int | None = None) -> list[RecallResult]:
         """Semantic recall, ranked by the composite score (docs/core.md).
@@ -195,9 +292,12 @@ class Store:
         )
         with self._lock:
             results: list[RecallResult] = []
+            # Superseded memories are never served: a newer memory replaced
+            # them (docs/core.md). Forgetting the newer one un-supersedes.
             rows = self._conn.execute(
                 "SELECT m.*, e.vector FROM memories m "
-                "JOIN embeddings e ON e.memory_id = m.id"
+                "JOIN embeddings e ON e.memory_id = m.id "
+                "WHERE m.superseded_by IS NULL"
             ).fetchall()
             for row in rows:
                 similarity = _cosine(query_vec, _unpack(row["vector"]))
@@ -261,14 +361,32 @@ class Store:
             learned_today = self._conn.execute(
                 "SELECT COUNT(*) FROM memories WHERE created_at >= ?", (midnight,)
             ).fetchone()[0]
+            superseded = self._conn.execute(
+                "SELECT COUNT(*) FROM memories WHERE superseded_by IS NOT NULL"
+            ).fetchone()[0]
             last = self._conn.execute(
                 "SELECT MAX(last_recalled_at) FROM memories"
             ).fetchone()[0]
         return {
             "memory_count": count,
+            "superseded": superseded,
             "learned_today": learned_today,
             "last_recall_at": last,
         }
+
+
+def _int_ids(ids: list[int] | None) -> list[int]:
+    """Memory ids as ints. SQLite would match '3' to row 3 by affinity while
+    a Python set difference would not — normalise once, up front."""
+    out: list[int] = []
+    for i in ids or []:
+        if isinstance(i, bool) or not isinstance(i, (int, str)):
+            raise ValueError(f"memory id must be an integer (got {i!r})")
+        try:
+            out.append(int(i))
+        except ValueError:
+            raise ValueError(f"memory id must be an integer (got {i!r})") from None
+    return out
 
 
 def _row_to_memory(row: sqlite3.Row) -> Memory:
@@ -279,6 +397,7 @@ def _row_to_memory(row: sqlite3.Row) -> Memory:
         created_at=row["created_at"],
         last_recalled_at=row["last_recalled_at"],
         recall_count=row["recall_count"],
+        superseded_by=row["superseded_by"],
     )
 
 

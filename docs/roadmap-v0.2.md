@@ -68,6 +68,18 @@ caller learns there is an older claim; (2) optional `supersedes=[id]` on
 opt-in and leave core save/recall untouched. Numbers + fixture:
 `memory-proving-ground/results/s02_truth_changes__omnemo__none.json`.
 
+**Shipped in 0.2.0 (2026-09-07):** both. Re-run on the same fixture with
+real nomic embeddings: S02 went 0/3 → 2/3 — `memory-current` and
+`memory-not-stale` pass via `supersedes`. **Still failing: `ranker-current`**,
+the naive case (agent saves the new truth without knowing the old id; no
+supersede). The stale sentence literally contains the query word
+("clogged"), and 30 days of recency at the default weights
+(`weight_recency` 0.25, `fact` half-life 120 d → recency gap ≈ 0.04)
+cannot outvote the similarity gap. That is a ranking-weights question, to
+be tuned on real data with an ablation — not by nudging defaults blind.
+`near_duplicates` gives the *caller* the signal to supersede; it does not
+change ranking on its own, and that is deliberate.
+
 ## Explicitly NOT in v0.2
 
 - **Agent-to-agent messaging (a bus)** — needs a multi-agent household to

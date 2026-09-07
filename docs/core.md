@@ -14,9 +14,26 @@ so forgotten rows are zeroed, not left in freelist pages.
 
 ```
 meta        key, value                 -- embedder_name, embedder_dim
-memories    id, text, category, created_at, last_recalled_at, recall_count
+memories    id, text, category, created_at, last_recalled_at, recall_count,
+            superseded_by -> memories.id, ON DELETE SET NULL
 embeddings  memory_id -> vector (float32 blob), ON DELETE CASCADE
 ```
+
+- **Truth changes.** `save` returns `near_duplicates`: live memories whose
+  cosine to the new text is at/above `near_duplicate_similarity`. The
+  write always lands — nothing is held — the caller just learns an older
+  claim exists. `save(..., supersedes=[ids])` marks those memories as
+  replaced by the new one in the same transaction: `recall` never serves
+  them, `search` still lists them with `superseded_by` set. Forgetting the
+  newer memory clears `superseded_by` on the old one (SET NULL), so the
+  old claim comes back rather than vanishing. Unknown ids, and ids that
+  are already superseded, raise `ValueError` and nothing is written — a
+  retired memory keeps its first superseder. The near-duplicate scan is
+  a full pass over live vectors (the same cost as one recall);
+  `near_duplicate_limit = 0` turns it off. `stats` reports `superseded`
+  alongside the total `memory_count` (superseded rows still count — they
+  are in the store, just out of recall). Stores from 0.1.x gain the
+  column on first open.
 
 - **Forget deletes.** `forget` removes the row and its embedding — the
   memory is gone from the store, not hidden or deranked. There is no
@@ -68,6 +85,8 @@ path — these are the tuning knobs.
 | `default_category` | `"fact"` | Category used when `save` gets none |
 | `recall_limit` | `5` | Default max results from `recall` |
 | `search_limit` | `20` | Default max results from `search` |
+| `near_duplicate_similarity` | `0.90` | Cosine at/above which `save` reports an existing live memory as a near-duplicate |
+| `near_duplicate_limit` | `5` | Max near-duplicates reported per `save`; `0` skips the scan |
 | `fallback_importance` | `0.5` | Importance used for memories whose category was removed from config |
 | `fallback_half_life_multiplier` | `1.0` | Half-life multiplier for those same memories |
 

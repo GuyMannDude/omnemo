@@ -1,5 +1,28 @@
 # Omnemo Changelog
 
+## 0.2.0 — 2026-09-07
+
+- **Truth changes are no longer invisible to recall.** Found by the Memory
+  Proving Ground (S02, 2026-09-04): save "X is alive", then "X is
+  decommissioned", ask "is X alive?" — the stale sentence came back first,
+  with real embeddings. Two opt-in additions, core save/recall untouched:
+  `save` now returns `near_duplicates` (live memories at/above
+  `near_duplicate_similarity`, default 0.90, at most `near_duplicate_limit`)
+  so the caller learns an older claim exists — the write still lands,
+  nothing is held; and `save(..., supersedes=[ids])` marks those memories as
+  replaced: `recall` never serves them, `search` lists them with
+  `superseded_by`, and forgetting the superseder restores them. Unknown ids
+  raise and write nothing. MCP `save` takes `supersedes` and returns
+  `near_duplicates`; `search` reports `superseded_by`; CLI `save
+  --supersedes ID...` and prints near-duplicates. Schema: `memories` gains
+  `superseded_by` (migrated in place on first open of a 0.1.x store).
+- **Breaking, mildly:** `Store.save` returns a `SaveResult` instead of a
+  `Memory`. Every `Memory` field reads through (`.id`, `.category`,
+  `.created_at`, …) so existing callers keep working; `.memory` is the row
+  and `.near_duplicates` the signal. Superseding an already-superseded id
+  raises. `near_duplicate_limit = 0` turns the write-time scan off.
+  `stats()` gains `superseded`.
+
 ## 0.1.1 — 2026-08-30
 
 - Fix: `omnemo --version` (and the MCP server's advertised version) reported

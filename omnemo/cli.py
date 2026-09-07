@@ -41,6 +41,10 @@ def main(argv: list[str] | None = None) -> int:
     p_save = sub.add_parser("save", help="save one memory")
     p_save.add_argument("text")
     p_save.add_argument("--category", "-c", default=None)
+    p_save.add_argument(
+        "--supersedes", type=int, nargs="+", default=None, metavar="ID",
+        help="memory id(s) this one replaces; they stop being recalled",
+    )
 
     p_recall = sub.add_parser("recall", help="recall memories by meaning")
     p_recall.add_argument("query")
@@ -125,11 +129,15 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "save":
             try:
-                memory = store.save(args.text, args.category)
+                result = store.save(args.text, args.category, args.supersedes)
             except ValueError as e:
                 print(f"error: {e}", file=sys.stderr)
                 return 1
-            print(f"saved #{memory.id} [{memory.category}]")
+            print(f"saved #{result.id} [{result.category}]")
+            for n in result.near_duplicates:
+                print(f"  near-duplicate #{n.memory.id} ({n.similarity:.2f}): {n.memory.text}")
+            if result.near_duplicates:
+                print("  (if this replaces one, re-save with --supersedes ID)")
 
         elif args.command == "recall":
             results = store.recall(args.query, args.limit)
@@ -146,7 +154,8 @@ def main(argv: list[str] | None = None) -> int:
             if not memories:
                 print("no matches")
             for m in memories:
-                print(f"#{m.id} [{m.category}]  {m.text}")
+                mark = f"  (superseded by #{m.superseded_by})" if m.superseded_by else ""
+                print(f"#{m.id} [{m.category}]  {m.text}{mark}")
 
         elif args.command == "forget":
             if store.forget(args.id):
@@ -162,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
 
                 print(json.dumps(s))
             else:
-                print(f"memories:      {s['memory_count']}")
+                print(f"memories:      {s['memory_count']} ({s['superseded']} superseded)")
                 print(f"learned today: {s['learned_today']}")
                 print(f"last recall:   {_fmt_time(s['last_recall_at'])}")
     finally:

@@ -36,3 +36,28 @@ def test_tools_round_trip(store: Store) -> None:
 
     assert call("forget", {"id": saved["id"]}) == {"forgotten": True}
     assert call("recall", {"query": "where is the router password"}) == []
+
+
+def test_save_reports_near_duplicates_and_supersedes(store: Store) -> None:
+    server = build_server(store)
+
+    def call(name: str, arguments: dict):
+        result = asyncio.run(server.call_tool(name, arguments))
+        assert not result.is_error
+        if result.structured_content is not None:
+            return result.structured_content.get("result", result.structured_content)
+        return json.loads(result.content[0].text)
+
+    old = call("save", {"text": "The rig is alive and serving on port 9000"})
+    assert old["near_duplicates"] == []
+    dup = call("save", {"text": "The rig is alive and serving on port 9000 today"})
+    assert [n["id"] for n in dup["near_duplicates"]] == [old["id"]]
+    assert "similarity" in dup["near_duplicates"][0]
+
+    new = call("save", {"text": "The rig is decommissioned", "supersedes": [old["id"], dup["id"]]})
+    recalled = [r["id"] for r in call("recall", {"query": "is the rig alive"})]
+    assert new["id"] in recalled and old["id"] not in recalled and dup["id"] not in recalled
+
+    browse = {m["id"]: m for m in call("search", {"query": "rig"})}
+    assert browse[old["id"]]["superseded_by"] == new["id"]
+    assert browse[new["id"]]["superseded_by"] is None

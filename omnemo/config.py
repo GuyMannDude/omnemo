@@ -82,6 +82,14 @@ class Config:
     recall_limit: int = 5
     search_limit: int = 20
 
+    # Write-time near-duplicate signal: `save` reports live memories whose
+    # cosine to the new text is at/above this gate (at most the limit),
+    # so the caller can decide whether the new text supersedes an old claim.
+    # The scan is a full pass over live vectors (same cost as a recall);
+    # near_duplicate_limit = 0 turns it off.
+    near_duplicate_similarity: float = 0.90
+    near_duplicate_limit: int = 5
+
     # Parameters used for memories whose saved category is no longer in
     # the config (removed or renamed): recall degrades, never crashes.
     fallback_importance: float = 0.5
@@ -104,6 +112,8 @@ _SCALAR_TYPES: dict[str, type] = {
     "default_category": str,
     "recall_limit": int,
     "search_limit": int,
+    "near_duplicate_similarity": float,
+    "near_duplicate_limit": int,
     "fallback_importance": float,
     "fallback_half_life_multiplier": float,
 }
@@ -200,6 +210,15 @@ def _validate(config: Config) -> None:
         raise ConfigError(f"recall_limit must be >= 1 (got {config.recall_limit})")
     if config.search_limit < 1:
         raise ConfigError(f"search_limit must be >= 1 (got {config.search_limit})")
+    if not 0.0 <= config.near_duplicate_similarity <= 1.0:
+        raise ConfigError(
+            "near_duplicate_similarity must be between 0 and 1 "
+            f"(got {config.near_duplicate_similarity})"
+        )
+    if config.near_duplicate_limit < 0:
+        raise ConfigError(
+            f"near_duplicate_limit must be >= 0 (got {config.near_duplicate_limit})"
+        )
     if config.default_category not in config.categories:
         known = ", ".join(sorted(config.categories))
         raise ConfigError(

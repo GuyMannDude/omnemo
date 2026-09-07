@@ -230,6 +230,7 @@ def test_secure_delete_is_on(store: Store) -> None:
 def test_stats(store: Store) -> None:
     assert store.stats() == {
         "memory_count": 0,
+        "superseded": 0,
         "learned_today": 0,
         "last_recall_at": None,
     }
@@ -239,3 +240,143 @@ def test_stats(store: Store) -> None:
     assert s["memory_count"] == 1
     assert s["learned_today"] == 1
     assert s["last_recall_at"] is not None
+
+
+# -- truth changes: near-duplicate signal + supersede (0.2.0) -------------
+
+
+def test_save_reports_near_duplicates_but_still_lands(store: Store) -> None:
+    old = store.save("The test rig is alive and serving on port 9000")
+    assert old.near_duplicates == []
+    new = store.save("The test rig is alive and serving on port 9000 today")
+    assert new.id != old.id
+    assert [n.memory.id for n in new.near_duplicates] == [old.id]
+    assert new.near_duplicates[0].similarity >= store.config.near_duplicate_similarity
+    # Both live: nothing was held or demoted.
+    assert {r.memory.id for r in store.recall("test rig port")} == {old.id, new.id}
+
+
+def test_near_duplicates_ignore_unrelated_and_superseded(store: Store) -> None:
+    unrelated = store.save("The cat prefers the window seat")
+    old = store.save("The test rig is alive and serving on port 9000")
+    mid = store.save("The test rig is alive and serving on port 9000 still", supersedes=[old.id])
+    assert unrelated.id not in [n.memory.id for n in mid.near_duplicates]
+    # old is superseded now, so a third near-identical save sees only mid.
+    third = store.save("The test rig is alive and serving on port 9000 again")
+    assert [n.memory.id for n in third.near_duplicates] == [mid.id]
+
+
+def test_supersede_hides_old_from_recall_but_not_search(store: Store) -> None:
+    old = store.save("The rig is alive", category="fact")
+    new = store.save("The rig is decommissioned", category="fact", supersedes=[old.id])
+    ids = [r.memory.id for r in store.recall("is the rig alive")]
+    assert new.id in ids
+    assert old.id not in ids
+    browse = {m.id: m for m in store.search("rig")}
+    assert browse[old.id].superseded_by == new.id
+    assert browse[new.id].superseded_by is None
+
+
+def test_forgetting_the_superseder_restores_the_old_claim(store: Store) -> None:
+    old = store.save("The rig is alive")
+    new = store.save("The rig is decommissioned", supersedes=[old.id])
+    assert old.id not in [r.memory.id for r in store.recall("rig alive")]
+    assert store.forget(new.id) is True
+    assert old.id in [r.memory.id for r in store.recall("rig alive")]
+    assert store.search("rig")[0].superseded_by is None
+
+
+def test_supersede_unknown_id_writes_nothing(store: Store) -> None:
+    before = store.stats()["memory_count"]
+    with pytest.raises(ValueError, match="unknown memory id"):
+        store.save("The rig is decommissioned", supersedes=[9999])
+    assert store.stats()["memory_count"] == before
+
+
+def test_old_store_gains_superseded_by_column(tmp_path: Path) -> None:
+    """A store written by 0.1.x has no superseded_by column; opening it
+    under 0.2.0 migrates in place and keeps the rows."""
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(
+        """
+        CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE memories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL,
+            category TEXT NOT NULL, created_at REAL NOT NULL,
+            last_recalled_at REAL, recall_count INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE embeddings (
+            memory_id INTEGER PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
+            vector BLOB NOT NULL);
+        INSERT INTO meta VALUES ('embedder_name', 'fake:v1'), ('embedder_dim', '64');
+        """
+    )
+    conn.commit()
+    conn.close()
+    store = Store(path, FakeEmbedder(), Config())
+    try:
+        cols = {r[1] for r in store._conn.execute("PRAGMA table_info(memories)")}
+        assert "superseded_by" in cols
+        old = store.save("The rig is alive")
+        new = store.save("The rig is decommissioned", supersedes=[old.id])
+        assert [r.memory.id for r in store.recall("rig")] == [new.id]
+        # The ALTER-added foreign key must be enforced: forgetting the
+        # superseder restores the old row (ON DELETE SET NULL).
+        assert store.forget(new.id) is True
+        assert [r.memory.id for r in store.recall("rig")] == [old.id]
+    finally:
+        store.close()
+
+
+def test_cannot_resupersede_a_retired_memory(store: Store) -> None:
+    """Re-pointing a retired row would let forget() of the second superseder
+    resurrect the stale claim beside the memory that already replaced it."""
+    old = store.save("The rig is alive")
+    second = store.save("The rig is decommissioned", supersedes=[old.id])
+    with pytest.raises(ValueError, match="already superseded"):
+        store.save("The rig is scrapped", supersedes=[old.id])
+    assert store.stats()["memory_count"] == 2
+    ids = [r.memory.id for r in store.recall("rig")]
+    assert ids == [second.id]
+
+
+def test_supersedes_accepts_string_ids_and_rejects_junk(store: Store) -> None:
+    old = store.save("The rig is alive")
+    new = store.save("The rig is decommissioned", supersedes=[str(old.id)])
+    assert {m.id: m.superseded_by for m in store.search("rig")}[old.id] == new.id
+    with pytest.raises(ValueError, match="must be an integer"):
+        store.save("junk", supersedes=["abc"])
+
+
+def test_near_duplicate_limit_zero_turns_the_scan_off(tmp_path: Path) -> None:
+    s = Store(tmp_path / "s.db", FakeEmbedder(), Config(near_duplicate_limit=0))
+    try:
+        s.save("The rig is alive")
+        assert s.save("The rig is alive").near_duplicates == []
+    finally:
+        s.close()
+
+
+def test_near_duplicate_limit_truncates(tmp_path: Path) -> None:
+    s = Store(tmp_path / "s.db", FakeEmbedder(), Config(near_duplicate_limit=2))
+    try:
+        for _ in range(3):
+            s.save("The rig is alive")
+        assert len(s.save("The rig is alive").near_duplicates) == 2
+    finally:
+        s.close()
+
+
+def test_save_result_reads_through_every_memory_field(store: Store) -> None:
+    r = store.save("The rig is alive")
+    assert r.created_at == r.memory.created_at
+    assert r.recall_count == 0 and r.superseded_by is None
+    with pytest.raises(AttributeError):
+        r.nonexistent_field
+
+
+def test_stats_counts_superseded(store: Store) -> None:
+    old = store.save("The rig is alive")
+    store.save("The rig is decommissioned", supersedes=[old.id])
+    s = store.stats()
+    assert s["memory_count"] == 2 and s["superseded"] == 1

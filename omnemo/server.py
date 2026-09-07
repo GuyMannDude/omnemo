@@ -31,12 +31,28 @@ def build_server(store: Store) -> MCPServer:
         name="save",
         description=(
             "Save one memory. Use for durable facts, decisions, preferences, "
-            f"and incidents — not transient state. Categories: {categories}."
+            f"and incidents — not transient state. Categories: {categories}. "
+            "Returns near_duplicates (older memories saying nearly the same "
+            "thing); pass their ids as supersedes when this text replaces them."
         ),
     )
-    def save(text: str, category: str | None = None) -> dict:
-        memory = store.save(text, category)
-        return {"id": memory.id, "category": memory.category}
+    def save(
+        text: str,
+        category: str | None = None,
+        supersedes: list[int] | None = None,
+    ) -> dict:
+        """`supersedes`: ids this memory replaces — they stop being recalled.
+        The reply names near-duplicates already stored, so a caller can
+        save again with `supersedes` when the new text is the current truth."""
+        result = store.save(text, category, supersedes)
+        return {
+            "id": result.id,
+            "category": result.category,
+            "near_duplicates": [
+                {"id": n.memory.id, "text": n.memory.text, "similarity": round(n.similarity, 4)}
+                for n in result.near_duplicates
+            ],
+        }
 
     @server.tool(
         name="recall",
@@ -63,7 +79,8 @@ def build_server(store: Store) -> MCPServer:
     )
     def search(query: str, limit: int | None = None) -> list[dict]:
         return [
-            {"id": m.id, "text": m.text, "category": m.category}
+            {"id": m.id, "text": m.text, "category": m.category,
+             "superseded_by": m.superseded_by}
             for m in store.search(query, limit)
         ]
 
