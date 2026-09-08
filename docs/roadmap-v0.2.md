@@ -94,20 +94,18 @@ import re-embeds locally. Result:
 
 ## Found by the proving ground (2026-09-07) — recall cost, candidate for v0.3
 
-S05 "laptop latency" fills a 400-memory store and times 40 recalls on a
-CPU-only laptop (i7-11800H, powersave governor, no network). omnemo,
-in-process: p50 72.8 ms, p95 77.4 ms, cold 74 ms. The shared
-nomic-embed-text-v1.5 embed alone costs ~15 ms of that, so ~58 ms is the
-store. `Store.recall` selects every non-superseded row joined to its
-vector and runs a pure-Python cosine per row (768 dims × 400 rows), so the
-cost is linear in store size — at 4,000 memories it would be ~0.6 s per
-turn. Same run, same embedder, Mnemo through a full HTTP round trip: p50
-18 ms over a 140-memory lane plus a 60-memory pool (its lanes make the
-scan smaller by design; not a like-for-like row count, and the result says
-so). The shape that would fix it without changing behaviour: batch the
-cosine (numpy over a preloaded matrix, refreshed on write) or move the
-similarity into sqlite-vec; ranking stays identical, only the scan gets
-cheap. Result:
+S05 "laptop latency" fills one lane with 401 memories and times 40
+recalls on a CPU-only laptop (i7-11800H, powersave governor, no network);
+every platform searches the same 401 rows. omnemo, in-process: p50 72 ms,
+p95 76 ms, cold 71 ms. The shared nomic-embed-text-v1.5 embed alone costs
+~15 ms of that, so ~57 ms is the store. `Store.recall` selects every
+non-superseded row joined to its vector and runs a pure-Python cosine per
+row (768 dims × 401 rows), so the cost is linear in store size — at 4,000
+memories it would be ~0.6 s per turn. Same rows, same embedder, Mnemo
+through a full HTTP round trip: p50 20 ms, p95 21 ms. The shape that
+would fix it without changing behaviour: batch the cosine (numpy over a
+preloaded matrix, refreshed on write) or move the similarity into
+sqlite-vec; ranking stays identical, only the scan gets cheap. Result:
 `memory-proving-ground/results/s05_laptop_latency__omnemo__none.json`.
 
 ## Explicitly NOT in v0.2
