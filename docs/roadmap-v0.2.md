@@ -80,6 +80,18 @@ be tuned on real data with an ablation — not by nudging defaults blind.
 `near_duplicates` gives the *caller* the signal to supersede; it does not
 change ranking on its own, and that is deliberate.
 
+## Found by the proving ground (2026-09-07) — carry, candidate for v0.3
+
+S04 "offline carry" moves memory host → host on removable media with no
+network, hash-verified, and refuses a torn medium. omnemo reports
+UNSUPPORTED: `store.db` holds truth and vectors in one file and there is no
+export / verify / import. Copying the file by hand is untested and carries
+embedder-specific geometry — a second machine on a different embedder gets
+vectors it cannot use. The shape that would pass: export truth rows (text,
+category, timestamps, supersede links) as JSONL with a manifest of hashes,
+import re-embeds locally. Result:
+`memory-proving-ground/results/s04_offline_carry__omnemo__none.json`.
+
 ## Explicitly NOT in v0.2
 
 - **Agent-to-agent messaging (a bus)** — needs a multi-agent household to
