@@ -4,7 +4,7 @@ Written for both audiences: a human at a terminal, or an agent told
 *"Install Omnemo — follow INSTALL.md."* Every step ends with a check;
 do not continue past a failed check — report it instead.
 
-Requires: Omarchy 2.0+ (surveyed against 4.0.1), Python 3.11+.
+Requires: Omarchy 2.0+ (surveyed against 4.0.1, re-verified on 4.0.4), Python 3.11+.
 
 ## 1. Install the package
 
@@ -36,7 +36,7 @@ omnemo setup
 
 One command, idempotent, safe to re-run. It:
 
-- installs the **memory skill** and links it into every harness skill dir
+- installs the **memory skill** and links it into these harness skill dirs
   (`~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills`,
   `~/.pi/agent/skills`)
 - installs the **bar widget** at `~/.config/omarchy/plugins/omnemo.memory/`

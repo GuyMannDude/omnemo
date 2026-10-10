@@ -14,13 +14,15 @@ user plugins, hooks), so it survives every `omarchy update`.
 
 ## What you get
 
-- **Shared recall across all harnesses** — one memory store, spoken over MCP,
-  registered with every agent CLI Omarchy ships. Save in one, recall in any.
+- **Shared recall across harnesses** — one memory store, spoken over MCP,
+  registered with Claude Code, Codex, OpenCode, Crush and Gemini (Pi gets the
+  skill; its MCP registration is not supported yet). Save in one, recall in any.
 - **Human-like memory, not a fixed database** — recall blends similarity,
   recency, and importance; memories decay at different rates by kind, the way
   yours do.
-- **A memory skill** dropped into `~/.agents/skills/` — every harness learns
-  *when* to remember and *when* to recall, automatically.
+- **A memory skill** dropped into `~/.agents/skills/` and linked into the
+  Claude Code, Codex and Pi skill dirs — those harnesses learn *when* to
+  remember and *when* to recall, automatically.
 - **Crashes with a past** — Omarchy hands core dumps to your agent; Omnemo
   lets the agent answer "this crashed before, here's what fixed it."
 - **Memory in the bar** — an Omarchy shell plugin showing what your machine
@@ -28,8 +30,9 @@ user plugins, hooks), so it survives every `omarchy update`.
 
 ## Install
 
-> Fastest path: open your agent (`omarchy agent`) and say
-> **"Install Omnemo — follow INSTALL.md."** It will do the rest.
+> Fastest path: pick a default agent if you haven't
+> (`omarchy default agent claude`, or `codex`, …), open it (`omarchy agent`)
+> and say **"Install Omnemo — follow INSTALL.md."** It will do the rest.
 
 Manual instructions: [`INSTALL.md`](./INSTALL.md).
 
@@ -76,9 +79,10 @@ The memory belongs to the machine, not the harness.
 
 ## Status
 
-**v0.1 glove, proven on a clean Omarchy 4.0.1 box.** Fresh install to green
-in minutes: MCP registered with every shipping harness (verified read-back,
-not just name-matched), skill linked, bar widget live — and everything
+**v0.2.0, proven on a clean Omarchy 4.0.1 box and re-proven on 4.0.4
+(2026-10-09).** Fresh install to green in minutes: MCP registered with all five
+supported harnesses (verified read-back, not just name-matched), skill linked,
+bar widget live — and everything
 survives `omarchy update`, harness upgrades, theme switches, and a shell
 restart with zero re-setup. See [`SPEC.md`](./SPEC.md) for the design.
 
