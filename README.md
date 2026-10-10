@@ -79,12 +79,22 @@ The memory belongs to the machine, not the harness.
 
 ## Status
 
-**v0.2.0, proven on a clean Omarchy 4.0.1 box and re-proven on 4.0.4
-(2026-10-09).** Fresh install to green in minutes: MCP registered with all five
-supported harnesses (verified read-back, not just name-matched), skill linked,
-bar widget live — and everything
-survives `omarchy update`, harness upgrades, theme switches, and a shell
-restart with zero re-setup. See [`SPEC.md`](./SPEC.md) for the design.
+**v0.2.0, proven on a clean Omarchy 4.0.1 box (September 2026); partly
+re-verified on a clean Omarchy 4.0.4 box (2026-10-09).** Fresh install to green
+in minutes: MCP registered with all five supported harnesses (verified
+read-back, not just name-matched), skill linked, bar widget live.
+
+Re-proven on 4.0.4: the manual INSTALL walk, crash-durable save
+(`examples/crash_demo.py`), the skill surviving repeated `omarchy update` runs,
+theme switches and shell restarts, the bar plugin on the 4.0.4 Quickshell bar,
+and local-first operation with the network cut.
+
+Proven on 4.0.1 only, not yet re-run on 4.0.4: the agent-driven install
+("Install Omnemo — follow INSTALL.md"), save-in-one-harness / recall-in-another,
+and survival of harness upgrades. The crash-diagnosis hook is a real 4.0.4
+extension point; no agent was driven through a crash. OpenCode, Crush and
+Gemini are registered but were not driven. See [`SPEC.md`](./SPEC.md) for the
+design.
 
 ## Lineage
 
