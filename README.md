@@ -1,5 +1,7 @@
 # Omnemo — memory for Omarchy
 
+> **Status (2026-10-15): parked, repo archived.** Supporting Omnemo properly needs a dedicated Omarchy machine and we don't have one. The code is MIT and stays here as-is, read-only. Fork freely.
+
 > *Agents come and go. The memory abides.*
 
 **One shared memory for every agent harness on the box.**
