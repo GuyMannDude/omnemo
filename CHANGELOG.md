@@ -1,5 +1,15 @@
 # Omnemo Changelog
 
+## Unreleased
+
+- **INSTALL: a virtual environment is the default install.** Found on the
+  first real Omarchy 4.0.6 box (2026-10-23): fresh Omarchy has no pipx, and
+  installing it needs `sudo`, which an agent-driven install cannot answer.
+  The agent fell back to `~/.local/share/omnemo-venv` with a symlink at
+  `~/.local/bin/omnemo`; that path is now the documented default, with one
+  update command. pipx stays as the human alternative. No code change.
+- README: project resumed; the 2026-10-15 parked banner is gone.
+
 ## 0.2.0 — 2026-09-07
 
 - **Truth changes are no longer invisible to recall.** Found by the Memory

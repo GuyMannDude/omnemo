@@ -4,27 +4,30 @@ Written for both audiences: a human at a terminal, or an agent told
 *"Install Omnemo — follow INSTALL.md."* Every step ends with a check;
 do not continue past a failed check — report it instead.
 
-Requires: Omarchy 2.0+ (surveyed against 4.0.1, re-verified on 4.0.4), Python 3.11+.
+Requires: Omarchy 2.0+ (surveyed against 4.0.1, re-verified on 4.0.4, agent-driven install verified on 4.0.6), Python 3.11+.
 
 ## 1. Install the package
 
-Fresh Omarchy ships without pipx; install it first:
+A plain virtual environment is the default: it needs no `sudo`, so an
+agent can finish this step on a fresh box, and it gives updates one path.
 
 ```bash
-sudo pacman -Syu --needed python-pipx
+python3 -m venv ~/.local/share/omnemo-venv
+~/.local/share/omnemo-venv/bin/pip install git+https://github.com/GuyMannDude/omnemo
+mkdir -p ~/.local/bin
+ln -sf ~/.local/share/omnemo-venv/bin/omnemo ~/.local/bin/omnemo
 ```
 
-Then:
+Omarchy already puts `~/.local/bin` on `PATH`. To update later:
 
 ```bash
-pipx install omnemo
+~/.local/share/omnemo-venv/bin/pip install --upgrade git+https://github.com/GuyMannDude/omnemo
 ```
 
-Or, for the latest development version, straight from the repo:
-
-```bash
-pipx install git+https://github.com/GuyMannDude/omnemo
-```
+If you prefer pipx (a human at the terminal; fresh Omarchy ships without it
+and installing it needs `sudo`): `sudo pacman -Syu --needed python-pipx`,
+then `pipx install git+https://github.com/GuyMannDude/omnemo`. Pick one
+method and stay with it; mixing the two leaves two `omnemo` binaries.
 
 **Check:** `omnemo --version` prints a version.
 
@@ -91,7 +94,7 @@ minute; click it to refresh now.
 
 ```bash
 omnemo disconnect --all-pieces   # unregister harnesses, remove links/plugin/unit
-pipx uninstall omnemo
+rm ~/.local/bin/omnemo && rm -rf ~/.local/share/omnemo-venv   # or: pipx uninstall omnemo
 ```
 
 Your memory store (`~/.local/share/omnemo/`) is deliberately left in

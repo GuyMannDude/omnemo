@@ -1,6 +1,6 @@
 # Omnemo — memory for Omarchy
 
-> **Status (2026-10-15): parked, repo archived.** Supporting Omnemo properly needs a dedicated Omarchy machine and we don't have one. The code is MIT and stays here as-is, read-only. Fork freely.
+> **Status (2026-10-23): active again.** Omnemo now has its dedicated Omarchy box (a Latitude on Omarchy 4.0.6); the agent-driven install was verified there on 2026-10-23. MIT, fork freely.
 
 > *Agents come and go. The memory abides.*
 
