@@ -91,6 +91,12 @@ in**: ask it the same question — same answer, same store. With one
 harness, or a second one that is not logged in, this step is complete
 with the first check.
 
+If an agent is doing this install, it cannot open an interactive session
+of itself; a fresh non-interactive one works: for Claude Code,
+`claude -p "Use the omnemo MCP server to recall: when was omnemo installed?" --allowedTools mcp__omnemo__recall`.
+Headless Codex (`codex exec`) does not approve MCP calls by default, so
+check Codex interactively.
+
 ## 5. Show the bar widget (optional)
 
 Third-party plugins are discovered but land **disabled** — enable ours,

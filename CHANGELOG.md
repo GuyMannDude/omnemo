@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- INSTALL step 4: how an agent installer verifies without an interactive
+  session (`claude -p … --allowedTools mcp__omnemo__recall`), and that
+  headless Codex blocks MCP approvals by default. From the second zero-fix
+  stranger run, 2026-10-24. Words only.
 - INSTALL/Uninstall: `omarchy plugin disable omnemo.memory` first, because
   `disconnect --all-pieces` removes the widget's files but leaves its spot
   in the bar layout (`~/.config/omarchy/shell.json`). Found on the gate-1
