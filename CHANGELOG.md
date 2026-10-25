@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- **SKILL.md: when to act, not just what to save.** Day one on a real
+  Omarchy 4.0.6 box with an empty store (2026-10-24): the save rules held,
+  but the agent kept the user's basics in its own private memory and the
+  shared store stayed near-empty. Wording only, no code change:
+  a new-store paragraph (learn how the user wants answers, early, ask once);
+  "choices the user made" (save that they chose a setting and why, not the
+  setting); "tell the user" in one sentence when you save something about
+  them; how Omnemo relates to a harness's private memory; a privacy bullet
+  (health, money, family: ask before saving to a shared store); and
+  **Session bookends** — open with a literal `search "where we left off"`,
+  close by saving decisions and ONE rolling left-off note per project
+  (category `fact`, superseding the previous one). The bookends were run
+  live before shipping: a `transient` note ranks too low to be found, and
+  `recall` ranks a multi-sentence note below older facts while `search`
+  finds it every time — hence the literal phrase and the category.
 - **INSTALL: a virtual environment is the default install.** Found on the
   first real Omarchy 4.0.6 box (2026-10-23): fresh Omarchy has no pipx, and
   installing it needs `sudo`, which an agent-driven install cannot answer.
