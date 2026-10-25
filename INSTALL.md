@@ -61,7 +61,7 @@ One command, idempotent, safe to re-run. It:
 
 **Check:** the summary lists each piece, and every harness row reads
 `ok` (`registered`, `already`, `skipped — not installed`, or for pi
-`skipped — MCP registration not supported yet`; pi gets the skill only).
+`skipped — MCP registration not supported yet (skill link only)`).
 A `FAIL` row names what to fix; the other rows are still in effect.
 
 ## 3. Verify memory works end to end
