@@ -60,8 +60,9 @@ One command, idempotent, safe to re-run. It:
   it could not verify is printed as `FAIL`, never assumed
 
 **Check:** the summary lists each piece, and every harness row reads
-`ok` (`registered`, `already`, or `skipped — not installed`). A `FAIL`
-row names what to fix; the other rows are still in effect.
+`ok` (`registered`, `already`, `skipped — not installed`, or for pi
+`skipped — MCP registration not supported yet`; pi gets the skill only).
+A `FAIL` row names what to fix; the other rows are still in effect.
 
 ## 3. Verify memory works end to end
 
@@ -76,12 +77,16 @@ omnemo stats
 
 ## 4. Verify a harness sees the server
 
-Open your usual agent (e.g. `claude`) and ask it:
+Start a **new** session of your usual agent (e.g. `claude`) and ask it:
 *"Use the omnemo MCP server to recall: when was omnemo installed?"*
+A session that was already open when setup ran does not see the new
+server until it restarts — that includes the agent doing this install.
 
 **Check:** the agent calls the `recall` tool and reports the fact from
-step 3. Cross-harness: ask a *different* harness the same question —
-same answer, same store.
+step 3. Cross-harness, if a *second* harness is installed **and logged
+in**: ask it the same question — same answer, same store. With one
+harness, or a second one that is not logged in, this step is complete
+with the first check.
 
 ## 5. Show the bar widget (optional)
 

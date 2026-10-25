@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **INSTALL: three things the first zero-fix stranger run tripped on**
+  (gate-1 run on the 4.0.6 box, 2026-10-24): the pi setup row says
+  `skipped — MCP registration not supported yet`, which the doc's list of
+  ok rows did not name; step 4 must be run from a NEW agent session,
+  because the session that ran setup (the installing agent itself) cannot
+  see the new MCP server until it restarts; and the cross-harness check
+  now says what to do when the second harness is missing or not logged
+  in. Words only.
 - **The documented update was a silent no-op.** Found on the first real
   update of the 4.0.6 box (2026-10-24): `pip install --upgrade git+…`
   resolved the new commit and installed nothing, because the version number
