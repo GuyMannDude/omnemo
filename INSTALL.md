@@ -110,9 +110,14 @@ minute; click it to refresh now.
 ## Uninstall
 
 ```bash
+omarchy plugin disable omnemo.memory   # if you enabled the bar widget: frees its spot on the bar
 omnemo disconnect --all-pieces   # unregister harnesses, remove links/plugin/unit
 rm ~/.local/bin/omnemo && rm -rf ~/.local/share/omnemo-venv   # or: pipx uninstall omnemo
 ```
+
+(`disconnect` removes the widget's files but not its place in the bar
+layout; the first line does that, and is harmless if the widget was
+never enabled.)
 
 Your memory store (`~/.local/share/omnemo/`) is deliberately left in
 place; delete it yourself if you want the memories gone.

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- INSTALL/Uninstall: `omarchy plugin disable omnemo.memory` first, because
+  `disconnect --all-pieces` removes the widget's files but leaves its spot
+  in the bar layout (`~/.config/omarchy/shell.json`). Found on the gate-1
+  wipe, 2026-10-24. Words only; a `disconnect` that does it itself is a
+  post-release candidate.
 - INSTALL: Gemini lists the server as `Disabled` until the folder is
   trusted (Gemini 0.65 folder trust, not a registration fault). Found on
   the gate-1 run, 2026-10-24; one explanatory line at step 2.
