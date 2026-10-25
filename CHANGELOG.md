@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- INSTALL: Gemini lists the server as `Disabled` until the folder is
+  trusted (Gemini 0.65 folder trust, not a registration fault). Found on
+  the gate-1 run, 2026-10-24; one explanatory line at step 2.
 - **INSTALL: three things the first zero-fix stranger run tripped on**
   (gate-1 run on the 4.0.6 box, 2026-10-24): the pi setup row says
   `skipped — MCP registration not supported yet`, which the doc's list of

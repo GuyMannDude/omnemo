@@ -63,6 +63,9 @@ One command, idempotent, safe to re-run. It:
 `ok` (`registered`, `already`, `skipped — not installed`, or for pi
 `skipped — MCP registration not supported yet (skill link only)`).
 A `FAIL` row names what to fix; the other rows are still in effect.
+Gemini note: `gemini mcp list` shows `omnemo … - Disabled` until you trust
+the folder you run Gemini in (it asks on its first interactive launch
+there). The registration is correct; trust turns it on.
 
 ## 3. Verify memory works end to end
 
