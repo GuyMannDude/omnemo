@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **The documented update was a silent no-op.** Found on the first real
+  update of the 4.0.6 box (2026-10-24): `pip install --upgrade git+…`
+  resolved the new commit and installed nothing, because the version number
+  had not changed, and `omnemo setup` then re-copied the OLD packaged skill
+  with a fresh timestamp. The command reported success either way. Fixes:
+  the version now moves ahead of a release (`0.2.1.dev1`, so main delivers),
+  and INSTALL's "To update later" is two lines — the pip upgrade, then
+  `omnemo setup`, since the skill, bar plugin and warm-up unit are copies —
+  with a check that `omnemo --version` actually changed. No code change.
 - **SKILL.md: when to act, not just what to save.** Day one on a real
   Omarchy 4.0.6 box with an empty store (2026-10-24): the save rules held,
   but the agent kept the user's basics in its own private memory and the

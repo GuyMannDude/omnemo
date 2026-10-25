@@ -18,11 +18,20 @@ mkdir -p ~/.local/bin
 ln -sf ~/.local/share/omnemo-venv/bin/omnemo ~/.local/bin/omnemo
 ```
 
-Omarchy already puts `~/.local/bin` on `PATH`. To update later:
+Omarchy already puts `~/.local/bin` on `PATH`. To update later, two lines —
+the package, then the copies it installs (the skill, the bar plugin and the
+warm-up unit are copies made by `omnemo setup`; they stay old until it runs
+again):
 
 ```bash
 ~/.local/share/omnemo-venv/bin/pip install --upgrade git+https://github.com/GuyMannDude/omnemo
+omnemo setup
 ```
+
+**Check:** `omnemo --version` shows a newer version than before. If it does
+not, nothing was updated: pip reinstalls only when the version number changes
+(every Omnemo release bumps it) and otherwise says "Requirement already
+satisfied" instead of failing.
 
 If you prefer pipx (a human at the terminal; fresh Omarchy ships without it
 and installing it needs `sudo`): `sudo pacman -Syu --needed python-pipx`,
