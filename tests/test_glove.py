@@ -58,7 +58,7 @@ def test_setup_one_failing_step_does_not_stop_the_others(tmp_path, monkeypatch):
         glove, "install_warm_unit", lambda home: ["warm-up: stubbed"]
     )
     lines, results = glove.setup(home=tmp_path)
-    assert any("FAILED" in line and "skill" in line for line in lines)
+    assert any(line.startswith("[fail] skill:") for line in lines)
     # The plugin step after the explosion still ran.
     assert (tmp_path / ".config/omarchy/plugins/omnemo.memory/manifest.json").exists()
     # And the harness sweep still reported all six rows.

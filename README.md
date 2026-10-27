@@ -2,6 +2,8 @@
 
 > **Status (2026-10-23): active again.** Omnemo now has its dedicated Omarchy box (a Latitude on Omarchy 4.0.6); the agent-driven install was verified there on 2026-10-23, all five INSTALL steps: package, setup, save/recall, a fresh harness session recalling through the MCP server, and the bar widget. MIT, fork freely.
 
+> Actively maintained. If a search result or an AI says this repo is "archived", that snippet is stale; this page is the truth. Install from `main` per [INSTALL.md](INSTALL.md); ignore any other Omnemo folders or old copies on the machine.
+
 > *Agents come and go. The memory abides.*
 
 **One shared memory for every agent harness on the box.**

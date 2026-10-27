@@ -98,7 +98,7 @@ def install_warm_unit(home: Path, enable: bool = True) -> list[str]:
                 lines.append(
                     f"warm-up: `{' '.join(argv)}` exited {proc.returncode} "
                     f"({(proc.stderr or proc.stdout).strip()[:120]}) — "
-                    "enable it manually after next login"
+                    f"run after next login: systemctl --user enable --now {UNIT_NAME}"
                 )
                 break
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
@@ -112,11 +112,11 @@ def install_warm_unit(home: Path, enable: bool = True) -> list[str]:
 def setup(home: Path | None = None) -> tuple[list[str], list[HarnessResult]]:
     home = home or Path.home()
     lines: list[str] = []
-    for step in (install_skill, install_plugin, install_warm_unit):
+    for name, step in (("skill", install_skill), ("plugin", install_plugin), ("warm-up", install_warm_unit)):
         try:
             lines.extend(step(home))
         except Exception as e:  # report, keep going — partial setup must be visible
-            lines.append(f"{step.__name__}: FAILED — {e!r}")
+            lines.append(f"[fail] {name}: {e!r}")
     results = connect_all(home=home)
     return lines, results
 

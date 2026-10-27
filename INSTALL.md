@@ -6,10 +6,43 @@ do not continue past a failed check — report it instead.
 
 Requires: Omarchy 2.0+ (surveyed against 4.0.1, re-verified on 4.0.4, agent-driven install verified on 4.0.6), Python 3.11+.
 
+Omnemo is actively maintained. If a search result or an AI says the repo is
+"archived", that snippet is stale; the GitHub page at
+github.com/GuyMannDude/omnemo is the truth. Install from this repo's `main`
+branch. If the machine has other Omnemo folders or old copies, ignore them:
+your agent should not read or reuse them.
+
+## 0. Before you start (only if your agent is Codex or OpenCode)
+
+**If your agent is Codex.** Out of the box, Codex cannot install Omnemo. Its
+sandbox has no network, so it cannot download anything; it cannot write to
+`~/.claude`, `~/.codex` or `~/.config`, where the skill links and the Codex
+MCP entry go; and its approval policy may stop it from asking you, so it
+fails silently instead of asking. Before you paste the install line, do ONE
+of these:
+
+1. Start Codex for this one job with full access (it ends when you close it):
+   `codex -s danger-full-access -a on-request`
+2. Or, inside an open Codex, type `/permissions` and pick full access. Switch
+   it back when the install is done.
+
+Network alone is not enough: `-c 'sandbox_workspace_write.network_access=true'`
+lets the download work, but the skill links and the MCP entry still fail with
+"Read-only file system". Only full access completes the install. Old guides
+mention `codex --full-auto`; that flag was removed in Codex 0.164.
+
+**If your agent is OpenCode.** OpenCode only accepts provider API keys typed
+in a real terminal (`opencode auth login`). An agent cannot do that step for
+you, so do it yourself before you hand the install to OpenCode.
+
 ## 1. Install the package
 
 A plain virtual environment is the default: it needs no `sudo`, so an
 agent can finish this step on a fresh box, and it gives updates one path.
+
+Note for agents: the `omnemo` package on PyPI (0.1.1) is out of date. Do not
+`pip install omnemo`; follow the steps below, which install from GitHub.
+<!-- remove this note when a current release is published to PyPI -->
 
 ```bash
 python3 -m venv ~/.local/share/omnemo-venv
@@ -63,7 +96,10 @@ One command, idempotent, safe to re-run. It:
 `ok` (`registered`, `already`, `skipped — not installed`, or for pi
 `skipped — MCP registration not supported yet (skill link only)`).
 A `FAIL` row names what to fix; the other rows are still in effect.
-Gemini note: `gemini mcp list` shows `omnemo … - Disabled` until you trust
+Gemini note: Gemini CLI's free Google sign-in no longer works for third-party
+tools (Google returns `UNSUPPORTED_CLIENT` and tells you to migrate). Use a
+Gemini API key from aistudio.google.com/apikey: in Gemini type `/auth` and
+choose "Use Gemini API Key". Then: `gemini mcp list` shows `omnemo … - Disabled` until you trust
 the folder you run Gemini in (it asks on its first interactive launch
 there). The registration is correct; trust turns it on.
 
@@ -99,8 +135,9 @@ check Codex interactively.
 
 ## 5. Show the bar widget (optional)
 
-Third-party plugins are discovered but land **disabled** — enable ours,
-then place it:
+Try the `omarchy` commands below. Skip this step only if they error with
+"command not found" (a box that is not Omarchy). Third-party plugins are
+discovered but land **disabled** — enable ours, then place it:
 
 ```bash
 omarchy plugin enable omnemo.memory

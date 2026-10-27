@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- INSTALL step 0 (new): Codex needs full access for this one job
+  (`codex -s danger-full-access -a on-request` or `/permissions`); network
+  alone leaves the skill links and MCP entry on a read-only file system;
+  `--full-auto` is gone in Codex 0.164. OpenCode keys must be typed in a real
+  terminal before the hand-off. (gate-2 findings on the test box, 2026-10-25.)
+- INSTALL + README: "actively maintained" line against stale "archived"
+  snippets; install from `main`, ignore other Omnemo copies on the machine.
+- INSTALL step 1: the PyPI `omnemo` 0.1.1 is stale, do not pip-install it by
+  name. Step 2: Gemini free sign-in is retired for third-party tools, use an
+  API key via `/auth`. Step 5: try the omarchy commands, skip only on
+  "command not found".
+- `omnemo setup`: a failed glove step prints `[fail] <step>: <reason>` like the
+  harness rows; a warm-up unit that will not enable prints the exact
+  `systemctl --user enable --now` line to run.
 - INSTALL step 4: how an agent installer verifies without an interactive
   session (`claude -p … --allowedTools mcp__omnemo__recall`), and that
   headless Codex blocks MCP approvals by default. From the second zero-fix
