@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `omnemo setup` now writes three keys under `[mcp_servers.omnemo]` in
+  `~/.codex/config.toml` after registering with Codex: `required = true`,
+  `startup_timeout_sec = 30`, `default_tools_approval_mode = "approve"`.
+  Without them Codex starts before `omnemo serve` is ready and misses its
+  tools, and headless `codex exec` refuses the calls. Re-running `omnemo
+  setup` on an older install adds them. (gate-2 finding F12 on the test box,
+  2026-10-27; Codex 0.164.) INSTALL step 4 gains the `codex exec` check.
 - INSTALL step 0 (new): Codex needs full access for this one job
   (`codex -s danger-full-access -a on-request` or `/permissions`); network
   alone leaves the skill links and MCP entry on a read-only file system;

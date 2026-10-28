@@ -22,12 +22,28 @@ import json
 import os
 import shutil
 import subprocess
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
 SERVER_NAME = "omnemo"
 SERVER_COMMAND = ["omnemo", "serve"]
+
+# Codex needs three keys under [mcp_servers.omnemo] that `codex mcp add`
+# does not write, or Omnemo is registered yet unusable (test box, 2026-10-27):
+# `required` — Codex otherwise starts without a server still initializing
+#   ("omitting pending optional MCP server"), and `omnemo serve` loads its
+#   embedder first, so the tools were missing on the first turn;
+# `startup_timeout_sec` — the default 10 s is tight on a 4 GB box;
+# `default_tools_approval_mode` — MCP tools default to asking, and headless
+#   `codex exec` runs with approval "never", so recall was refused outright.
+CODEX_CONFIG = ".codex/config.toml"
+CODEX_SERVER_KEYS: dict[str, object] = {
+    "required": True,
+    "startup_timeout_sec": 30,
+    "default_tools_approval_mode": "approve",
+}
 
 # Injection point for tests: run(argv) -> (exit_code, stdout+stderr text).
 Runner = Callable[[list[str]], tuple[int, str]]
@@ -90,6 +106,10 @@ def _merge_json_key(path: Path, keys: list[str], value: dict) -> None:
 
 
 def _write_json_atomic(path: Path, data: dict) -> None:
+    _write_text_atomic(path, json.dumps(data, indent=2) + "\n")
+
+
+def _write_text_atomic(path: Path, text: str) -> None:
     """Atomic replace that PRESERVES the file's permission bits. These
     configs routinely hold API keys; a fresh temp file under the umask
     would silently widen a user's deliberate 0600 to world-readable."""
@@ -98,12 +118,69 @@ def _write_json_atomic(path: Path, data: dict) -> None:
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     try:
         with os.fdopen(fd, "w") as f:
-            f.write(json.dumps(data, indent=2) + "\n")
+            f.write(text)
         os.chmod(tmp, mode)
         os.replace(tmp, path)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
+
+
+def _toml_value(v: object) -> str:
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, int):
+        return str(v)
+    return json.dumps(str(v))  # TOML basic strings are JSON-compatible
+
+
+def _codex_server_table(path: Path) -> dict | None:
+    """The [mcp_servers.omnemo] table as Codex will parse it, or None."""
+    if not path.exists():
+        return None
+    node = tomllib.loads(path.read_text()).get("mcp_servers")
+    node = node.get(SERVER_NAME) if isinstance(node, dict) else None
+    return node if isinstance(node, dict) else None
+
+
+def _tune_codex_config(path: Path, wanted: dict) -> tuple[bool, str]:
+    """Set `wanted` keys inside Codex's [mcp_servers.omnemo] table, touching
+    nothing else. The table itself comes from `codex mcp add`; we put our
+    lines right after its header and drop older lines for the same keys in
+    that table. Returns (changed, error); the new text is parsed BEFORE it
+    is written, so a bad edit never reaches disk."""
+    table = _codex_server_table(path)
+    if table is None:
+        return False, f"{path}: no [mcp_servers.{SERVER_NAME}] table to tune"
+    if all(table.get(k) == v for k, v in wanted.items()):
+        return False, ""
+    header = f"[mcp_servers.{SERVER_NAME}]"
+    lines = path.read_text().splitlines()
+    starts = [i for i, line in enumerate(lines) if line.strip() == header]
+    if len(starts) != 1:
+        return False, (
+            f"{path}: expected one plain {header} header, found "
+            f"{len(starts)}; add the keys by hand"
+        )
+    start = starts[0]
+    end = next(
+        (i for i in range(start + 1, len(lines)) if lines[i].lstrip().startswith("[")),
+        len(lines),
+    )
+    kept = [
+        line for line in lines[start + 1:end]
+        if line.split("=", 1)[0].strip() not in wanted
+    ]
+    ours = [f"{k} = {_toml_value(v)}" for k, v in wanted.items()]
+    text = "\n".join(lines[:start + 1] + ours + kept + lines[end:]) + "\n"
+    parsed = tomllib.loads(text)["mcp_servers"][SERVER_NAME]
+    if any(parsed.get(k) != v for k, v in wanted.items()):
+        return False, f"{path}: edited text does not parse to the wanted keys"
+    _write_text_atomic(path, text)
+    table = _codex_server_table(path)
+    if table is None or any(table.get(k) != v for k, v in wanted.items()):
+        return True, f"{path}: wrote Codex startup keys but read-back mismatched"
+    return True, ""
 
 
 def _read_json_key(path: Path, keys: list[str]):
@@ -251,6 +328,30 @@ class CodexHarness(_CliHarness):
     list_argv = ["codex", "mcp", "list"]
     get_argv = ["codex", "mcp", "get", SERVER_NAME]
     remove_argv = ["codex", "mcp", "remove", SERVER_NAME]
+
+    @property
+    def config_path(self) -> Path:
+        return self.home / CODEX_CONFIG
+
+    def connect(self) -> HarnessResult:
+        result = super().connect()
+        if result.action not in ("registered", "already"):
+            return result
+        # Registered is not usable: Codex also needs the startup keys
+        # (CODEX_SERVER_KEYS). `codex mcp remove` drops the whole table,
+        # so disconnect needs nothing extra.
+        try:
+            changed, err = _tune_codex_config(self.config_path, CODEX_SERVER_KEYS)
+        except (OSError, tomllib.TOMLDecodeError) as e:
+            return HarnessResult(self.name, "failed", f"startup keys: {e}")
+        if err:
+            return HarnessResult(self.name, "failed", err)
+        if not changed:
+            return result
+        detail = "startup keys written"
+        if result.detail:
+            detail = f"{result.detail}; {detail}"
+        return HarnessResult(self.name, "registered", detail)
 
 
 class _FileHarness(Harness):

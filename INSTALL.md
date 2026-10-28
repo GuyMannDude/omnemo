@@ -26,6 +26,11 @@ of these:
 2. Or, inside an open Codex, type `/permissions` and pick full access. Switch
    it back when the install is done.
 
+(After the install, `omnemo setup` adds `required`, `startup_timeout_sec`
+and `default_tools_approval_mode` under `[mcp_servers.omnemo]` in
+`~/.codex/config.toml`, so Codex waits for Omnemo and uses it without
+asking. Nothing for you to type.)
+
 Network alone is not enough: `-c 'sandbox_workspace_write.network_access=true'`
 lets the download work, but the skill links and the MCP entry still fail with
 "Read-only file system". Only full access completes the install. Old guides
@@ -130,8 +135,9 @@ with the first check.
 If an agent is doing this install, it cannot open an interactive session
 of itself; a fresh non-interactive one works: for Claude Code,
 `claude -p "Use the omnemo MCP server to recall: when was omnemo installed?" --allowedTools mcp__omnemo__recall`.
-Headless Codex (`codex exec`) does not approve MCP calls by default, so
-check Codex interactively.
+For Codex, `omnemo setup` has already written the keys that let a headless
+session wait for Omnemo and call it without a prompt, so this works:
+`codex exec -s read-only --skip-git-repo-check "Use the omnemo MCP recall tool to find when omnemo was installed and print the memory verbatim. Do not use shell commands." < /dev/null`
 
 ## 5. Show the bar widget (optional)
 
@@ -151,6 +157,10 @@ omarchy bar move omnemo.memory --section right
 minute; click it to refresh now.
 
 ## Uninstall
+
+Run `omnemo disconnect` before deleting anything by hand: it removes the
+Codex entry, which is marked `required`, so a Codex left pointing at a
+deleted Omnemo would refuse to start until that entry is gone.
 
 ```bash
 omarchy plugin disable omnemo.memory   # if you enabled the bar widget: frees its spot on the bar

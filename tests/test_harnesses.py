@@ -3,6 +3,7 @@ format is its own small adapter with its own test, and every write must be
 read back)."""
 
 import json
+import tomllib
 
 import pytest
 
@@ -125,6 +126,27 @@ def test_file_adapter_non_object_section_fails(tmp_path, cls, keys):
 GET_OK = "Command: omnemo\n  Args: serve"
 GET_STALE = "Command: /old/dead/venv/bin/omnemo\n  Args: serve"
 
+# What `codex mcp add` leaves in ~/.codex/config.toml (the fake runner
+# does not write it, so Codex tests seed it).
+CODEX_TABLE = '[mcp_servers.omnemo]\ncommand = "omnemo"\nargs = ["serve"]\n'
+# ...and the same table once `omnemo setup` has added the startup keys.
+CODEX_TABLE_TUNED = CODEX_TABLE + (
+    'required = true\nstartup_timeout_sec = 30\n'
+    'default_tools_approval_mode = "approve"\n'
+)
+
+
+def _seed_codex(home, text=CODEX_TABLE):
+    path = home / ".codex/config.toml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    return path
+
+
+def _codex_table(home):
+    data = tomllib.loads((home / ".codex/config.toml").read_text())
+    return data["mcp_servers"]["omnemo"]
+
 
 class FakeRunner:
     """Scripted CLI: maps the subcommand ('list'/'get'/'add'/'remove') to a
@@ -147,6 +169,8 @@ def _verbs(runner):
 
 @pytest.mark.parametrize("cls", [ClaudeHarness, CodexHarness])
 def test_cli_adapter_registers_with_readback(tmp_path, cls):
+    if cls is CodexHarness:
+        _seed_codex(tmp_path)
     runner = FakeRunner({
         "list": [(0, "nothing here"), (0, "omnemo: omnemo serve")],
         "get": [(0, GET_OK)],
@@ -171,6 +195,8 @@ def test_cli_adapter_add_without_readback_is_failure(tmp_path, cls):
 
 @pytest.mark.parametrize("cls", [ClaudeHarness, CodexHarness])
 def test_cli_adapter_already_registered(tmp_path, cls):
+    if cls is CodexHarness:
+        _seed_codex(tmp_path, CODEX_TABLE_TUNED)
     runner = FakeRunner({
         "list": [(0, "omnemo: omnemo serve")],
         "get": [(0, GET_OK)],
@@ -183,6 +209,8 @@ def test_cli_adapter_already_registered(tmp_path, cls):
 
 @pytest.mark.parametrize("cls", [ClaudeHarness, CodexHarness])
 def test_cli_adapter_repairs_stale_registration(tmp_path, cls):
+    if cls is CodexHarness:
+        _seed_codex(tmp_path)
     # Registered under our name but launching a dead binary: must be
     # replaced, never reported "already" (reviewer finding, 2026-08-28).
     runner = FakeRunner({
@@ -285,3 +313,97 @@ def test_connect_all_skips_undetected_and_survives_failures(tmp_path, monkeypatc
     assert results["gemini"].action == "skipped"
     # One harness failing never aborts the sweep.
     assert len(results) == 6
+
+
+# ---------- Codex startup keys (gate-2 F12, 2026-10-27) ----------
+
+def _codex_registered_runner():
+    return FakeRunner({
+        "list": [(0, "nothing here"), (0, "omnemo: omnemo serve")],
+        "get": [(0, GET_OK)],
+        "add": [(0, "Added")],
+    })
+
+
+def test_codex_writes_startup_keys_after_add(tmp_path):
+    _seed_codex(tmp_path)
+    result = CodexHarness(home=tmp_path, runner=_codex_registered_runner()).connect()
+    assert result.action == "registered"
+    assert "startup keys" in result.detail
+    table = _codex_table(tmp_path)
+    assert table["required"] is True
+    assert table["startup_timeout_sec"] == 30
+    assert table["default_tools_approval_mode"] == "approve"
+    # What `codex mcp add` wrote is untouched.
+    assert table["command"] == "omnemo" and table["args"] == ["serve"]
+
+
+def test_codex_startup_keys_idempotent(tmp_path):
+    _seed_codex(tmp_path)
+    runner = FakeRunner({
+        "list": [(0, "omnemo: omnemo serve")],
+        "get": [(0, GET_OK)],
+        "add": [],
+    })
+    assert CodexHarness(home=tmp_path, runner=runner).connect().action == "registered"
+    assert CodexHarness(home=tmp_path, runner=runner).connect().action == "already"
+
+
+def test_codex_startup_keys_replace_ours_and_keep_the_rest(tmp_path):
+    _seed_codex(tmp_path, (
+        'model = "gpt-5"\n\n'
+        '[mcp_servers.omnemo]\n'
+        'command = "omnemo"\n'
+        'args = ["serve"]\n'
+        'required = false\n'
+        'env = { OMNEMO_LOG = "debug" }\n\n'
+        '[mcp_servers.other]\n'
+        'command = "x"\n'
+    ))
+    result = CodexHarness(home=tmp_path, runner=_codex_registered_runner()).connect()
+    assert result.action == "registered"
+    text = (tmp_path / ".codex/config.toml").read_text()
+    data = tomllib.loads(text)
+    assert data["model"] == "gpt-5"
+    assert data["mcp_servers"]["other"] == {"command": "x"}
+    table = data["mcp_servers"]["omnemo"]
+    assert table["required"] is True
+    assert table["env"] == {"OMNEMO_LOG": "debug"}
+    assert text.count("required =") == 1
+
+
+def test_codex_missing_table_after_add_is_failure(tmp_path):
+    # Registered per the CLI, but no table to tune: say so, never assume.
+    result = CodexHarness(home=tmp_path, runner=_codex_registered_runner()).connect()
+    assert result.action == "failed"
+    assert "no [mcp_servers.omnemo]" in result.detail
+
+
+def test_codex_corrupt_toml_fails_cleanly(tmp_path):
+    path = _seed_codex(tmp_path, "[mcp_servers.omnemo\ncommand = ")
+    result = CodexHarness(home=tmp_path, runner=_codex_registered_runner()).connect()
+    assert result.action == "failed"
+    assert path.read_text() == "[mcp_servers.omnemo\ncommand = "
+
+
+def test_codex_startup_keys_preserve_file_mode(tmp_path):
+    path = _seed_codex(tmp_path)
+    path.chmod(0o600)
+    assert CodexHarness(home=tmp_path, runner=_codex_registered_runner()).connect().action == "registered"
+    assert path.stat().st_mode & 0o777 == 0o600
+
+
+def test_codex_registered_before_the_keys_existed_gets_them(tmp_path):
+    # An install from before 0.2.1.dev3: the CLI says registered, the
+    # table lacks the keys. `omnemo setup` must add them, and say so.
+    _seed_codex(tmp_path)
+    runner = FakeRunner({
+        "list": [(0, "omnemo: omnemo serve")],
+        "get": [(0, GET_OK)],
+        "add": [],
+    })
+    result = CodexHarness(home=tmp_path, runner=runner).connect()
+    assert result.action == "registered"
+    assert result.detail == "startup keys written"
+    assert "add" not in _verbs(runner)
+    assert _codex_table(tmp_path)["required"] is True
