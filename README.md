@@ -81,6 +81,27 @@ codex
 One memory, written by one vendor's agent, recalled by its competitor.
 The memory belongs to the machine, not the harness.
 
+## What to expect on a low-spec box
+
+Measured 2026-10-30 on a 2016 laptop: Intel i3-6100U (2 cores / 4 threads),
+3.7 GB RAM, Omarchy 4.5.0rc2 (rc channel), Omnemo 0.2.1.dev3, timed over the
+real MCP stdio path.
+
+| What | Number |
+| --- | --- |
+| Cold start (spawn `omnemo serve` → first recall answered) | 2.6 s |
+| Warm recall, 20 calls (4 memories) | p50 167 ms, p95 202 ms |
+| Warm recall, 20 calls (1,000 memories) | p50 136 ms, p95 148 ms |
+| Save | p50 79 ms, p95 139 ms |
+| Server memory (RSS), warm | ~330 MB (337 MB at 1,000 memories) |
+| Store on disk | 32 KB at 4 · 236 KB at 100 · 2.1 MB at 1,000 memories |
+| One-shot CLI `omnemo recall` (loads the model each time) | 1.6–1.9 s |
+
+Most of the memory and the cold start is the local embedding model
+(`BAAI/bge-small-en-v1.5`). Each harness runs its own server, so budget
+~330 MB per open harness on a 4 GB machine. The cold start was measured with
+the model already in the OS file cache; the first run after a reboot is slower.
+
 ## Status
 
 **v0.2.0, proven on a clean Omarchy 4.0.1 box (September 2026); partly
