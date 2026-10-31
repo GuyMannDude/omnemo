@@ -40,6 +40,15 @@ user plugins, hooks), so it survives every `omarchy update`.
 
 Manual instructions: [`INSTALL.md`](./INSTALL.md).
 
+## Using your memory
+
+There's nothing new to learn. Talk to your AI helper (Claude, Codex, OpenCode or another) the way you always do. When you tell it something worth keeping, like your name, how you like answers, or a project you're working on, it saves it and tells you in one sentence that it did. Next time, in a new chat or even in a different AI app on the same computer, it already knows.
+
+- **Want something gone?** Just say so: "forget that I…". Your helper finds it, confirms which one, removes it, and tells you.
+- **Personal things** (health, money, family): your helper asks before it saves them.
+- **Where it lives:** in one folder on this computer, `~/.local/share/omnemo`. Omnemo itself sends nothing anywhere. When your helper reads a memory to answer you, its AI service sees that memory, the same as anything you type to it.
+- **Starting fresh:** to wipe everything, copy that folder somewhere safe, then delete it.
+
 ## Prove it
 
 Memory is durable the instant a save returns — a crashing harness loses
