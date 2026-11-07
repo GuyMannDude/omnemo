@@ -19,7 +19,7 @@
   never invented. `disconnect --all-pieces` still leaves the layout alone;
   Uninstall now opens with `omnemo bar off`. README: "memory in the bar"
   moves from the feature list to a one-line optional extra. Version
-  `0.2.1.dev4`. Unit-tested on IGOR; not yet run on a real Omarchy box.
+  `0.2.1.dev4`. Unit-tested; not yet run on a real Omarchy box.
 - `omnemo setup` now writes three keys under `[mcp_servers.omnemo]` in
   `~/.codex/config.toml` after registering with Codex: `required = true`,
   `startup_timeout_sec = 30`, `default_tools_approval_mode = "approve"`.
