@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- **The bar widget is opt-in (#1).** Ruling 2026-10-30: a user does not need
+  a memory display, and the Omnemo OS edition leaves `omnemo.memory` off the
+  bar. `omnemo setup` never edited the bar layout (it copies the plugin files
+  and Omarchy lists third-party plugins as disabled), but Omnemo had no
+  command of its own to put the widget on the bar or take it off, so INSTALL
+  step 5 and Uninstall leaned on `omarchy plugin enable|disable` and
+  `omarchy bar move`. Now `omnemo setup --bar` or `omnemo bar on` adds
+  `omnemo.memory` to the right section of `~/.config/omarchy/shell.json`
+  (once; a widget moved elsewhere stays put; an earlier
+  `omarchy plugin disable` is undone), and `omnemo bar off` removes it from
+  every section, no error when absent. Every other key and the file's
+  permission bits are preserved; both entry forms are handled (bare ids as
+  on 4.5 boxes, `{"id": …}` objects as in stock master). A box with no bar
+  layout yet is told the one `omarchy bar move` line to run; the layout is
+  never invented. `disconnect --all-pieces` still leaves the layout alone;
+  Uninstall now opens with `omnemo bar off`. README: "memory in the bar"
+  moves from the feature list to a one-line optional extra. Version
+  `0.2.1.dev4`. Unit-tested on IGOR; not yet run on a real Omarchy box.
 - `omnemo setup` now writes three keys under `[mcp_servers.omnemo]` in
   `~/.codex/config.toml` after registering with Codex: `required = true`,
   `startup_timeout_sec = 30`, `default_tools_approval_mode = "approve"`.

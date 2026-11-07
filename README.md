@@ -29,8 +29,9 @@ user plugins, hooks), so it survives every `omarchy update`.
   remember and *when* to recall, automatically.
 - **Crashes with a past** — Omarchy hands core dumps to your agent; Omnemo
   lets the agent answer "this crashed before, here's what fixed it."
-- **Memory in the bar** — an Omarchy shell plugin showing what your machine
-  remembered today.
+
+Optional extra, off by default: a memory count in the Omarchy bar —
+`omnemo setup --bar` (or `omnemo bar on` any time; `omnemo bar off` removes it).
 
 ## Install
 

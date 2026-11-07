@@ -10,6 +10,9 @@ docs/omarchy-survey.md):
                    ~/.config/omarchy/plugins/omnemo.memory/ (hot-reloaded).
 3. Warm-up       → systemd user oneshot that pre-loads the embedder at boot.
 4. Harnesses     → connect_all() MCP registration with read-back verify.
+5. Bar (opt-in)  → `setup --bar` / `omnemo bar on|off`: a spot for the
+                   widget in the bar layout (~/.config/omarchy/shell.json,
+                   hot-reloaded). Plain `setup` leaves the layout alone (#1).
 
 Every step reports what it did; nothing stops the remaining steps.
 """
@@ -21,7 +24,13 @@ import subprocess
 from importlib import resources
 from pathlib import Path
 
-from .harnesses import HarnessResult, connect_all, disconnect_all
+from .harnesses import (
+    HarnessResult,
+    _merge_json_key,
+    _read_json_key,
+    connect_all,
+    disconnect_all,
+)
 
 # The dirs Omarchy's own provisioning links skills into (survey).
 SKILL_LINK_DIRS = [
@@ -34,6 +43,8 @@ SKILL_LINK_DIRS = [
 SKILL_NAME = "omnemo"
 PLUGIN_ID = "omnemo.memory"
 UNIT_NAME = "omnemo-warm.service"
+SHELL_JSON = ".config/omarchy/shell.json"
+BAR_SECTION = "right"
 
 
 def _copy_asset_tree(asset: str, dest: Path) -> None:
@@ -109,10 +120,81 @@ def install_warm_unit(home: Path, enable: bool = True) -> list[str]:
     return lines
 
 
-def setup(home: Path | None = None) -> tuple[list[str], list[HarnessResult]]:
+def _is_ours(entry) -> bool:
+    """A layout entry is a bare id (Omarchy 4.5 boxes) or an object with an
+    id (stock shell.json on master); both forms are on real machines."""
+    return entry == PLUGIN_ID or (isinstance(entry, dict) and entry.get("id") == PLUGIN_ID)
+
+
+def _bar_layout(home: Path) -> tuple[Path, dict | None]:
+    path = home / SHELL_JSON
+    layout = _read_json_key(path, ["bar", "layout"])
+    if layout is not None and not isinstance(layout, dict):
+        raise ValueError(f"{path}: bar.layout is not an object")
+    return path, layout
+
+
+def _section_with_widget(layout: dict) -> str | None:
+    for section, entries in layout.items():
+        if isinstance(entries, list) and any(_is_ours(e) for e in entries):
+            return section
+    return None
+
+
+def bar_on(home: Path) -> list[str]:
+    """Give the widget a spot in the bar layout (the plugin files are
+    install_plugin's job). Idempotent: already on the bar means no write."""
+    path, layout = _bar_layout(home)
+    if layout is None:
+        raise RuntimeError(
+            f"no bar layout in {path} yet — run "
+            f"`omarchy bar move {PLUGIN_ID} --section {BAR_SECTION}` once "
+            "from your desktop session (it writes the full layout)"
+        )
+    section = _section_with_widget(layout)
+    if section:
+        lines = [f"bar: {PLUGIN_ID} already on the bar ({section})"]
+    else:
+        # Mirror the file's own entry form so the shell keeps reading it.
+        objects = any(
+            isinstance(e, dict)
+            for entries in layout.values() if isinstance(entries, list)
+            for e in entries
+        )
+        layout.setdefault(BAR_SECTION, []).append(
+            {"id": PLUGIN_ID} if objects else PLUGIN_ID
+        )
+        _merge_json_key(path, ["bar", "layout"], layout)
+        lines = [f"bar: {PLUGIN_ID} added to the {BAR_SECTION} section of {path} (hot-reloads)"]
+    disabled = _read_json_key(path, ["disabledPlugins"])
+    if isinstance(disabled, list) and PLUGIN_ID in disabled:
+        _merge_json_key(path, ["disabledPlugins"], [p for p in disabled if p != PLUGIN_ID])
+        lines.append(f"bar: {PLUGIN_ID} re-enabled (an earlier `omarchy plugin disable` had it off)")
+    return lines
+
+
+def bar_off(home: Path) -> list[str]:
+    """Take the widget off the bar. Not there (or no layout at all) is fine."""
+    path, layout = _bar_layout(home)
+    if layout is None:
+        return [f"bar: {PLUGIN_ID} not on the bar (no layout in {path})"]
+    kept = {
+        section: [e for e in entries if not _is_ours(e)] if isinstance(entries, list) else entries
+        for section, entries in layout.items()
+    }
+    if kept == layout:
+        return [f"bar: {PLUGIN_ID} not on the bar"]
+    _merge_json_key(path, ["bar", "layout"], kept)
+    return [f"bar: {PLUGIN_ID} removed from {path} (hot-reloads)"]
+
+
+def setup(home: Path | None = None, bar: bool = False) -> tuple[list[str], list[HarnessResult]]:
     home = home or Path.home()
     lines: list[str] = []
-    for name, step in (("skill", install_skill), ("plugin", install_plugin), ("warm-up", install_warm_unit)):
+    steps = [("skill", install_skill), ("plugin", install_plugin), ("warm-up", install_warm_unit)]
+    if bar:
+        steps.append(("bar", bar_on))
+    for name, step in steps:
         try:
             lines.extend(step(home))
         except Exception as e:  # report, keep going — partial setup must be visible

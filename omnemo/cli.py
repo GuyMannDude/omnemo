@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import sys
 from datetime import datetime
+from pathlib import Path
 
 from . import __version__
 from .config import ConfigError, load_config, store_path
@@ -64,10 +65,16 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("warm", help="pre-load the embedder (boot warm-up)")
 
-    sub.add_parser(
+    p_setup = sub.add_parser(
         "setup",
         help="install the Omarchy glove: skill, bar plugin, warm-up, connect",
     )
+    p_setup.add_argument(
+        "--bar", action="store_true",
+        help="also put the memory widget on the bar (same as `omnemo bar on`)",
+    )
+    p_bar = sub.add_parser("bar", help="memory widget on the Omarchy bar: on | off")
+    p_bar.add_argument("state", choices=("on", "off"))
     sub.add_parser("connect", help="register the MCP server with every harness")
     p_disc = sub.add_parser("disconnect", help="unregister from every harness")
     p_disc.add_argument(
@@ -77,12 +84,23 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
-    if args.command in ("setup", "connect", "disconnect"):
+    if args.command in ("setup", "connect", "disconnect", "bar"):
         from .omarchy import glove
         from .omarchy.harnesses import connect_all, disconnect_all
 
         if args.command == "setup":
-            lines, results = glove.setup()
+            lines, results = glove.setup(bar=args.bar)
+        elif args.command == "bar":
+            home = Path.home()
+            try:
+                if args.state == "on":
+                    lines = glove.install_plugin(home) + glove.bar_on(home)
+                else:
+                    lines = glove.bar_off(home)
+            except Exception as e:  # one step, one [fail] row, like setup
+                print(f"[fail] bar: {e}", file=sys.stderr)
+                return 1
+            results = []
         elif args.command == "connect":
             lines, results = [], connect_all()
         elif getattr(args, "all_pieces", False):

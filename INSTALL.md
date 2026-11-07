@@ -89,7 +89,8 @@ One command, idempotent, safe to re-run. It:
 - installs the **memory skill** and links it into these harness skill dirs
   (`~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills`,
   `~/.pi/agent/skills`)
-- installs the **bar widget** at `~/.config/omarchy/plugins/omnemo.memory/`
+- installs the **bar widget** files at `~/.config/omarchy/plugins/omnemo.memory/`
+  (the bar itself is left alone; add `--bar` to show the widget, see step 5)
 - writes and enables the **warm-up service** (`omnemo-warm.service`,
   systemd user unit — pre-loads the embedding model at login; the first
   run downloads the model, which can take a few minutes)
@@ -141,17 +142,19 @@ session wait for Omnemo and call it without a prompt, so this works:
 
 ## 5. Show the bar widget (optional)
 
-Try the `omarchy` commands below. Skip this step only if they error with
-"command not found" (a box that is not Omarchy). Third-party plugins are
-discovered but land **disabled** — enable ours, then place it:
+Off by default: nothing on the bar says Omnemo is there. For a memory count
+in the bar, run this (or `omnemo setup --bar` in step 2); skip this step on
+a box that is not Omarchy:
 
 ```bash
-omarchy plugin enable omnemo.memory
-omarchy bar move omnemo.memory --section right
+omnemo bar on
 ```
 
-(Run these inside the graphical session — they talk to the running
-`omarchy-shell`.)
+It adds `omnemo.memory` to the right section of the bar layout
+(`~/.config/omarchy/shell.json`, which the shell reloads on save) and works
+from any shell in your desktop login. `omnemo bar off` takes it away again.
+If it reports that there is no bar layout yet, run
+`omarchy bar move omnemo.memory --section right` once instead.
 
 **Check:** the bar shows `𝍇 N` (your memory count). It refreshes every
 minute; click it to refresh now.
@@ -163,14 +166,15 @@ Codex entry, which is marked `required`, so a Codex left pointing at a
 deleted Omnemo would refuse to start until that entry is gone.
 
 ```bash
-omarchy plugin disable omnemo.memory   # if you enabled the bar widget: frees its spot on the bar
+omnemo bar off   # frees the widget's spot on the bar; a no-op if it was never there
 omnemo disconnect --all-pieces   # unregister harnesses, remove links/plugin/unit
 rm ~/.local/bin/omnemo && rm -rf ~/.local/share/omnemo-venv   # or: pipx uninstall omnemo
 ```
 
 (`disconnect` removes the widget's files but not its place in the bar
 layout; the first line does that, and is harmless if the widget was
-never enabled.)
+never on the bar. `omarchy plugin disable omnemo.memory` does the same
+through Omarchy.)
 
 Your memory store (`~/.local/share/omnemo/`) is deliberately left in
 place; delete it yourself if you want the memories gone.
