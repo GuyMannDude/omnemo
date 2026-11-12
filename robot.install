@@ -49,7 +49,7 @@
     {
       "id": "setup",
       "run": "omnemo setup",
-      "add_flag": "--bar only if the human wants a memory count on the bar (off by default)",
+      "add_flag": "--bar only if the human wants a memory count on the bar (off by default). With it, the bar shows a count like `𝍇 12`; it refreshes every minute (click it to refresh now) and can show `?` for up to 60 s at first.",
       "check": "every harness row reads ok: registered, already, skipped — not installed, or for pi skipped — MCP registration not supported yet. A FAIL row names what to fix; the other rows still took effect. The first run downloads the embedding model and can take a few minutes."
     },
     {
