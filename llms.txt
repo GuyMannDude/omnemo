@@ -1,0 +1,38 @@
+# Omnemo
+
+> One shared memory for every AI agent harness on an Omarchy computer. A small local MCP server (save, recall, search, forget) over one SQLite store, registered by `omnemo setup` with Claude Code, Codex, OpenCode, Crush and Gemini CLI. Save in one harness, recall in any. Local-first, no telemetry, MIT.
+
+Omnemo is the memory core of Mnemo Cortex, cut down to just memory and fitted to Omarchy through its own extension points (skills, user plugins, a systemd user unit), so it survives `omarchy update`. Recall ranks by meaning (local embeddings, default `BAAI/bge-small-en-v1.5`), recency, category importance and recall count; memories in different categories fade at different rates, and everything is tunable in `~/.config/omnemo/config.toml`. A save is on disk when the call returns.
+
+Install from GitHub `main` by following INSTALL.md (no sudo, no prompts). The PyPI package `omnemo` is 0.1.1 and out of date: do not `pip install omnemo`. Before installing, get your human's yes: setup registers an MCP server in each installed agent's config and adds a login service. Main is 0.2.1.dev4; the last tagged release is v0.2.0.
+
+## Docs
+
+- [INSTALL.md](https://github.com/GuyMannDude/omnemo/blob/main/INSTALL.md): The install guide, for a person or an agent told "Install Omnemo — follow INSTALL.md". Every step ends with a check. Includes what Codex and OpenCode need first, update, and uninstall.
+- [README](https://github.com/GuyMannDude/omnemo/blob/main/README.md): What it is, how to use your memory in plain words, live cross-harness proof, numbers on a low-spec laptop.
+- [SPEC.md](https://github.com/GuyMannDude/omnemo/blob/main/SPEC.md): The original v0.1 design spec: non-goals, the memory core, the four Omarchy integrations, decisions.
+- [CHANGELOG](https://github.com/GuyMannDude/omnemo/blob/main/CHANGELOG.md): Release history, including what is on main but not yet tagged.
+
+## Agent Manifests
+
+- [robot.info](https://github.com/GuyMannDude/omnemo/blob/main/robot.info): Structured product manifest (JSON with // comments). The four MCP tools and every CLI command with their arguments, every config.toml key with its default and what it changes, which harness config file each registration writes, privacy, 12 common questions, uninstall. Read this first to answer a user's questions.
+- [robot.install](https://github.com/GuyMannDude/omnemo/blob/main/robot.install): The INSTALL.md commands as data, each with its check, plus what Codex and OpenCode need first, update and uninstall. There is no robot-install.sh: Omnemo's install is these commands.
+
+## Code
+
+- [omnemo/server.py](https://github.com/GuyMannDude/omnemo/blob/main/omnemo/server.py): The MCP server and its four tools.
+- [omnemo/config.py](https://github.com/GuyMannDude/omnemo/blob/main/omnemo/config.py): Every tunable with its default, and the validation rules.
+- [omnemo/cli.py](https://github.com/GuyMannDude/omnemo/blob/main/omnemo/cli.py): The `omnemo` command and its subcommands.
+- [omnemo/omarchy/harnesses.py](https://github.com/GuyMannDude/omnemo/blob/main/omnemo/omarchy/harnesses.py): How each harness is registered and read back.
+- [Memory skill](https://github.com/GuyMannDude/omnemo/blob/main/omnemo/omarchy/assets/skill/SKILL.md): What the agents are told about when to save and recall.
+
+## Related
+
+- [Omnemo OS](https://github.com/GuyMannDude/omnemo-os): Our edition of Omarchy, a friendlier desktop that installs Omnemo for you.
+- [Mnemo Cortex](https://github.com/GuyMannDude/mnemo-cortex): The bigger, server-based memory system Omnemo's core came from. Not needed for Omnemo.
+
+## Optional
+
+- [examples/crash_demo.py](https://github.com/GuyMannDude/omnemo/blob/main/examples/crash_demo.py): Proof that a save survives the server being killed right after it returns.
+- [docs/omarchy-survey.md](https://github.com/GuyMannDude/omnemo/blob/main/docs/omarchy-survey.md): How each harness's config surface was surveyed on a live Omarchy box.
+- [Product page](https://projectsparks.ai/omnemo)

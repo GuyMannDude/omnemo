@@ -1,0 +1,84 @@
+{
+  // robot.install — Omnemo
+  //
+  // There is NO robot-install.sh for Omnemo. The real install path is
+  // INSTALL.md: four shell commands and one setup command, none of which
+  // asks a question. This file lists them as data, with the check that
+  // must pass after each one, so an agent can run them and stop on the
+  // first failed check. INSTALL.md is the source of truth; if this file
+  // and INSTALL.md ever disagree, follow INSTALL.md and report it.
+  //
+  // JSON with // line comments (strip them before parsing).
+
+  "product": "Omnemo",
+  "robot_install_sh": null,
+  "guide": "https://github.com/GuyMannDude/omnemo/blob/main/INSTALL.md",
+  "needs_sudo": false,
+  "asks_questions": false,
+
+  "requires": {
+    "os": "Omarchy (Arch Linux). INSTALL.md: Omarchy 2.0+, tested on 4.0.1, 4.0.4, 4.0.6 and 4.5.",
+    "python": ">=3.11",
+    "network": "Yes, to download the package from GitHub and, on first run, the embedding model.",
+    "ask_your_human_first": "Get your human's yes before installing. Setup changes their agents' config files (it registers an MCP server with each installed harness) and adds a login service."
+  },
+
+  "before_you_start": [
+    {"if": "the installing agent is Codex", "do": "It needs full access for this one job: the human starts it with `codex -s danger-full-access -a on-request`, or picks full access with /permissions. Network access alone is not enough (the skill links and MCP entry fail with 'Read-only file system')."},
+    {"if": "the installing agent is OpenCode", "do": "The human must run `opencode auth login` in a real terminal first; an agent cannot type the provider key."},
+    {"if": "an older Omnemo copy or folder is on the computer", "do": "Ignore it. Install from GitHub main."},
+    {"if": "you are tempted to `pip install omnemo`", "do": "Don't: the PyPI package is 0.1.1 and out of date."}
+  ],
+
+  "steps": [
+    {
+      "id": "venv",
+      "run": "python3 -m venv ~/.local/share/omnemo-venv",
+      "check": "~/.local/share/omnemo-venv/bin/pip exists"
+    },
+    {
+      "id": "package",
+      "run": "~/.local/share/omnemo-venv/bin/pip install git+https://github.com/GuyMannDude/omnemo",
+      "check": "exit code 0"
+    },
+    {
+      "id": "link",
+      "run": "mkdir -p ~/.local/bin && ln -sf ~/.local/share/omnemo-venv/bin/omnemo ~/.local/bin/omnemo",
+      "check": "`omnemo --version` prints a version"
+    },
+    {
+      "id": "setup",
+      "run": "omnemo setup",
+      "add_flag": "--bar only if the human wants a memory count on the bar (off by default)",
+      "check": "every harness row reads ok: registered, already, skipped — not installed, or for pi skipped — MCP registration not supported yet. A FAIL row names what to fix; the other rows still took effect. The first run downloads the embedding model and can take a few minutes."
+    },
+    {
+      "id": "verify_cli",
+      "run": "omnemo save \"Omnemo installed on this machine on $(date +%F)\" && omnemo recall \"when was omnemo installed\" && omnemo stats",
+      "check": "recall returns the fact just saved; stats shows memories >= 1"
+    },
+    {
+      "id": "verify_harness",
+      "run": "claude -p \"Use the omnemo MCP server to recall: when was omnemo installed?\" --allowedTools mcp__omnemo__recall",
+      "alternatives": {
+        "codex": "codex exec -s read-only --skip-git-repo-check \"Use the omnemo MCP recall tool to find when omnemo was installed and print the memory verbatim. Do not use shell commands.\" < /dev/null"
+      },
+      "check": "the answer contains the fact from verify_cli. Use a NEW session: the session that ran setup cannot see the new server."
+    }
+  ],
+
+  "update": [
+    "~/.local/share/omnemo-venv/bin/pip install --upgrade git+https://github.com/GuyMannDude/omnemo",
+    "omnemo setup"
+  ],
+
+  "uninstall": {
+    "steps": [
+      "omnemo bar off",
+      "omnemo disconnect --all-pieces",
+      "rm ~/.local/bin/omnemo && rm -rf ~/.local/share/omnemo-venv"
+    ],
+    "order_matters": "Run disconnect before deleting anything: the Codex entry is marked required, and Codex refuses to start while it points at a deleted Omnemo.",
+    "keeps": "~/.local/share/omnemo (the memories). Delete it only if the human asks; copy it somewhere safe first."
+  }
+}

@@ -1,0 +1,190 @@
+{
+  // robot.info — Omnemo
+  //
+  // Structured product manifest for AI agents. Paired with robot.install
+  // (install recipe) and llms.txt (docs index).
+  // Spec: https://github.com/GuyMannDude/mnemo-cortex/blob/master/ROBOT-INFO-SPEC.md
+  //
+  // Single JSON object, UTF-8. JavaScript-style // line comments are
+  // stripped before parsing. Every fact below is taken from this repo's
+  // code (omnemo/*.py) and INSTALL.md at the commit this file ships in.
+
+  "robot_info_version": "0.2",
+
+  "name": "Omnemo",
+  "tagline": "One shared memory for every AI agent harness on an Omarchy computer. Save in one, recall in any.",
+  "summary": "Omnemo is a small local memory server for the AI coding agents on an Omarchy Linux computer. It stores memories in one SQLite file, embeds them with a local model, and serves four MCP tools (save, recall, search, forget) over stdio. `omnemo setup` registers that server with Claude Code, Codex, OpenCode, Crush and Gemini CLI and reads each registration back, and installs a memory skill that tells the agents when to save and when to recall. So a fact Claude Code saved is recalled by Codex the next day.",
+  "version": "0.2.1.dev4",
+  "version_note": "Install from GitHub main (INSTALL.md); main is 0.2.1.dev4. The last tagged release is v0.2.0 (2026-09-07). The PyPI package `omnemo` is 0.1.1 and out of date: do not `pip install omnemo`.",
+  "license": "MIT",
+  "homepage": "https://projectsparks.ai/omnemo",
+  "source": "https://github.com/GuyMannDude/omnemo",
+  "contact": "https://github.com/GuyMannDude/omnemo/issues",
+  "maintainer": "Project Sparks",
+
+  "capabilities": [
+    "One memory store per computer user: ~/.local/share/omnemo/store.db (SQLite). Every harness that runs `omnemo serve` reads and writes the same file.",
+    "Four MCP tools over stdio: save, recall, search, forget.",
+    "Recall by meaning: local embeddings (default fastembed:BAAI/bge-small-en-v1.5), ranked by a composite score of similarity, recency, category importance and how often a memory was recalled. Candidates below min_similarity (0.35) are dropped.",
+    "Memories decay by kind: five categories (fact, decision, preference, incident, transient), each with its own importance and half-life multiplier on a 30-day base half-life. All tunable in config.toml.",
+    "Truth changes: save reports near-duplicates (cosine >= 0.90, at most 5) so the caller can pass their ids as `supersedes`; a superseded memory is never recalled, search still lists it with superseded_by, and forgetting the new memory brings the old one back.",
+    "Durable on return: a save is on disk when the call returns (examples/crash_demo.py kills the server right after a save and recalls it from a fresh process).",
+    "`omnemo setup` (idempotent): installs the memory skill and links it into ~/.agents/skills, ~/.claude/skills, ~/.codex/skills and ~/.pi/agent/skills; copies the bar widget files to ~/.config/omarchy/plugins/omnemo.memory/; writes and enables the omnemo-warm.service user unit (loads the model at login); registers the MCP server with each installed harness and reads every registration back. A row it cannot verify prints FAIL, never assumed.",
+    "Optional bar widget (off by default): `omnemo setup --bar` or `omnemo bar on` adds a memory count to the right of the Omarchy bar; `omnemo bar off` removes it.",
+    "Crash memory is skill guidance, not a code hook: when Omarchy hands an agent a crash (omarchy-agent-crash), the skill tells it to recall the crashing program's name first and to save the fix after.",
+    "Works offline after the first run (the first run downloads the embedding model once)."
+  ],
+
+  "exposes": {
+    "mcp_tools": [
+      {"name": "save", "purpose": "Save one memory. Args: text, category (optional; default 'fact'), supersedes (optional list of ids this replaces). Returns id, category, near_duplicates."},
+      {"name": "recall", "purpose": "Recall memories by meaning. Args: query, limit (optional; default 5). Returns id, text, category, similarity, score."},
+      {"name": "search", "purpose": "Literal substring search, case-insensitive. Args: query, limit (optional; default 20). Returns id, text, category, superseded_by."},
+      {"name": "forget", "purpose": "Permanently delete a memory by id (removed from the store, not hidden). Returns {forgotten: true|false}."}
+    ],
+    "cli": [
+      {"command": "omnemo serve", "purpose": "Run the MCP server on stdio (this is what harnesses start)."},
+      {"command": "omnemo save TEXT [--category/-c CAT] [--supersedes ID ...]", "purpose": "Save one memory from the shell."},
+      {"command": "omnemo recall QUERY [--limit/-n N]", "purpose": "Recall by meaning."},
+      {"command": "omnemo search QUERY [--limit/-n N]", "purpose": "Substring search."},
+      {"command": "omnemo forget ID", "purpose": "Permanently delete one memory."},
+      {"command": "omnemo stats [--json]", "purpose": "Memory count, learned today, last recall."},
+      {"command": "omnemo warm", "purpose": "Load the embedding model (what the warm-up unit runs at login)."},
+      {"command": "omnemo setup [--bar]", "purpose": "Install skill, bar widget files, warm-up unit, and register with every installed harness. --bar also puts the widget on the bar."},
+      {"command": "omnemo bar on|off", "purpose": "Put the memory widget on the Omarchy bar, or take it off."},
+      {"command": "omnemo connect", "purpose": "Register the MCP server with every installed harness (setup does this too)."},
+      {"command": "omnemo disconnect [--all-pieces]", "purpose": "Unregister from every harness; --all-pieces also removes the skill links, bar widget files and warm-up unit. Never touches the memory store."},
+      {"command": "omnemo --version", "purpose": "Print the installed version."}
+    ]
+  },
+
+  "configuration": {
+    "file": "~/.config/omnemo/config.toml ($XDG_CONFIG_HOME/omnemo/config.toml). Optional: a missing file or key uses the defaults below. A bad value stops with an error that names the key.",
+    "environment": [
+      {"name": "XDG_CONFIG_HOME", "default": "~/.config", "changes": "Where config.toml is read from (<XDG_CONFIG_HOME>/omnemo/config.toml)."},
+      {"name": "XDG_DATA_HOME", "default": "~/.local/share", "changes": "Where the memory store lives (<XDG_DATA_HOME>/omnemo/store.db)."}
+    ],
+    "keys": [
+      {"key": "embedder", "default": "fastembed:BAAI/bge-small-en-v1.5", "changes": "Embedding model. Only the fastembed:<model> form is supported. A store is locked to the embedder it was created with: Omnemo refuses to open an existing store under a different one, so changing this needs a fresh store."},
+      {"key": "min_similarity", "default": 0.35, "changes": "Recall drops candidates below this cosine similarity."},
+      {"key": "weight_similarity", "default": 1.0, "changes": "Weight of similarity in the recall score."},
+      {"key": "weight_recency", "default": 0.25, "changes": "Weight of recency (0.5 ** (age_days / (base_half_life_days * category half_life_multiplier)))."},
+      {"key": "weight_importance", "default": 0.15, "changes": "Weight of the category's importance."},
+      {"key": "weight_recall_count", "default": 0.10, "changes": "Weight of how often the memory was recalled (capped at recall_count_cap)."},
+      {"key": "base_half_life_days", "default": 30.0, "changes": "Base recency half-life in days (must be > 0)."},
+      {"key": "recall_count_cap", "default": 10, "changes": "Recall count at which the frequency bonus stops growing (>= 1)."},
+      {"key": "default_category", "default": "fact", "changes": "Category used when a save names none. Must be a configured category."},
+      {"key": "recall_limit", "default": 5, "changes": "Results recall returns when no limit is given."},
+      {"key": "search_limit", "default": 20, "changes": "Results search returns when no limit is given."},
+      {"key": "near_duplicate_similarity", "default": 0.90, "changes": "Cosine at/above which save reports an older memory as a near-duplicate (0..1)."},
+      {"key": "near_duplicate_limit", "default": 5, "changes": "Most near-duplicates save reports. 0 turns the check off."},
+      {"key": "fallback_importance", "default": 0.5, "changes": "Importance for memories whose category was removed from the config, and the default for a new category that omits importance."},
+      {"key": "fallback_half_life_multiplier", "default": 1.0, "changes": "Half-life multiplier for the same cases."},
+      {"key": "[categories.<name>] importance / half_life_multiplier", "default": "fact 0.6/4.0 · decision 1.0/6.0 · preference 0.8/8.0 · incident 0.9/2.0 · transient 0.2/0.25", "changes": "Tune a shipped category or add a new one (a new name becomes a valid category for save)."}
+    ],
+    "example": "# ~/.config/omnemo/config.toml\nrecall_limit = 8\nbase_half_life_days = 60\n\n[categories.recipe]\nimportance = 0.7\nhalf_life_multiplier = 10"
+  },
+
+  "install": {
+    "guide": "./INSTALL.md",
+    "robot_install": "./robot.install",
+    "robot_install_sh": null,
+    "manual_docs": "https://github.com/GuyMannDude/omnemo/blob/main/INSTALL.md",
+    "platforms": ["omarchy (Arch Linux)"],
+    "platform_note": "Built for Omarchy (INSTALL.md: Omarchy 2.0+, tested on 4.0.1, 4.0.4, 4.0.6 and 4.5). The memory server itself is plain Python; the setup steps (skill dirs, bar widget, harness registration) assume an Omarchy desktop.",
+    "runtime": "python>=3.11",
+    "dependencies": ["mcp>=2", "fastembed>=0.8"],
+    "agent_driven": "On Omarchy, pick a default agent (`omarchy default agent claude`), open it (`omarchy agent`) and say: \"Install Omnemo — follow INSTALL.md.\""
+  },
+
+  "compatibility": {
+    "mcp_hosts": ["Claude Code", "Codex CLI", "OpenCode", "Crush", "Gemini CLI"],
+    "skill_only": ["Pi (skill linked; MCP registration not supported yet)"],
+    "registration": [
+      {"harness": "claude", "how": "`claude mcp add` (read back with `claude mcp list`)"},
+      {"harness": "codex", "how": "`codex mcp add`, then setup adds required = true, startup_timeout_sec = 30, default_tools_approval_mode = \"approve\" under [mcp_servers.omnemo] in ~/.codex/config.toml"},
+      {"harness": "opencode", "how": "key mcp.omnemo in ~/.config/opencode/opencode.json"},
+      {"harness": "crush", "how": "key mcp.omnemo in ~/.config/crush/crush.json"},
+      {"harness": "gemini", "how": "key mcpServers.omnemo in ~/.gemini/settings.json"}
+    ],
+    "models": "Model-agnostic: any agent that can call MCP tools.",
+    "protocols": ["MCP (stdio transport)"]
+  },
+
+  "privacy": {
+    "telemetry": "none",
+    "data_location": "~/.local/share/omnemo/store.db on this computer.",
+    "auth": "None: a local stdio server started by the harness itself, never listening on a network port.",
+    "outbound_calls": [
+      "Model download, once: fastembed fetches the embedding model on first use. After that Omnemo works with the network off.",
+      "Note: Omnemo sends nothing anywhere, but when an agent reads a memory to answer you, that agent's AI service sees the memory, like anything else you type to it."
+    ]
+  },
+
+  "related": [
+    {"name": "Omnemo OS", "url": "https://github.com/GuyMannDude/omnemo-os", "purpose": "Our edition of Omarchy: a friendlier desktop that installs Omnemo for you."},
+    {"name": "Mnemo Cortex", "url": "https://github.com/GuyMannDude/mnemo-cortex", "purpose": "The bigger, server-based memory system Omnemo's core was cut down from. Not needed for Omnemo."},
+    {"name": "llms.txt", "url": "./llms.txt", "purpose": "LLM-friendly docs index"},
+    {"name": "robot.install", "url": "./robot.install", "purpose": "Install recipe for an agent"},
+    {"name": "robot.info spec", "url": "https://github.com/GuyMannDude/mnemo-cortex/blob/master/ROBOT-INFO-SPEC.md", "purpose": "Schema for this file"}
+  ],
+
+  "common_questions": [
+    {"q": "What does Omnemo do?", "a": "It gives every AI coding agent on an Omarchy computer one shared memory. Claude Code, Codex, OpenCode, Crush and Gemini all talk to the same store over MCP, so what one saves, the others can recall."},
+    {"q": "How do I install it?", "a": "Follow INSTALL.md: a Python virtual environment, `pip install git+https://github.com/GuyMannDude/omnemo`, a link into ~/.local/bin, then `omnemo setup`. No sudo. Or ask your Omarchy agent: \"Install Omnemo — follow INSTALL.md.\""},
+    {"q": "Can I pip install omnemo?", "a": "No. The PyPI package is 0.1.1 and out of date. Install from GitHub main as INSTALL.md shows."},
+    {"q": "Where are my memories stored?", "a": "In ~/.local/share/omnemo/store.db, on your computer. Omnemo never sends them anywhere. To wipe everything, copy that folder somewhere safe and delete it."},
+    {"q": "Which agents does it work with?", "a": "Claude Code, Codex, OpenCode, Crush and Gemini CLI get the MCP server. Pi gets the memory skill only; its MCP registration is not supported yet."},
+    {"q": "I installed it but my agent does not see the tools.", "a": "Start a NEW session: one that was already open when setup ran does not see the server. Then run `omnemo setup` again and read its rows; any FAIL row says what to fix. For Gemini, the server shows as Disabled until you trust the folder you run Gemini in."},
+    {"q": "Codex says it cannot install it.", "a": "Codex's default sandbox has no network and cannot write the config folders. Start it for this one job with `codex -s danger-full-access -a on-request`, or pick full access with /permissions, then switch back after."},
+    {"q": "How do I make the agent forget something?", "a": "Ask it to (\"forget that I…\"). It finds the memory and calls forget with its id. From a terminal: `omnemo search WORD` to find the id, then `omnemo forget ID`. Forget deletes it for good."},
+    {"q": "Something I told it changed. Will it keep giving the old answer?", "a": "Saving the new fact returns the older look-alikes as near_duplicates; saving again with `supersedes` set to their ids means recall only gives the new one. From the shell: `omnemo save \"new fact\" --supersedes 12`."},
+    {"q": "Can I change how it ranks or how fast memories fade?", "a": "Yes, in ~/.config/omnemo/config.toml: recall weights, the 30-day base half-life, limits, near-duplicate settings, and per-category importance and half-life. You can add your own categories."},
+    {"q": "How much memory and disk does it use?", "a": "Measured on a 2016 two-core laptop: about 330 MB of RAM per running server (each open agent runs its own), about 2.1 MB of disk at 1,000 memories, warm recall around 140–170 ms."},
+    {"q": "How do I uninstall it?", "a": "`omnemo bar off`, then `omnemo disconnect --all-pieces`, then remove ~/.local/bin/omnemo and ~/.local/share/omnemo-venv. Run disconnect first: Codex refuses to start while its required Omnemo entry points at a deleted program. Your memories in ~/.local/share/omnemo stay until you delete them."}
+  ],
+
+  "why": "Every AI helper on your computer forgets you when you close it, and none of them knows what the others learned. Omnemo gives them one shared memory on your own computer: tell one of them something worth keeping, and next time, in a new chat or even a different AI app, it already knows.",
+
+  "install_steps": [
+    {"step": 1, "instruction": "If your AI helper is Codex, start it with full access for this one job (`codex -s danger-full-access -a on-request`). If it is OpenCode, sign in with `opencode auth login` yourself first."},
+    {"step": 2, "instruction": "Open your AI helper (`omarchy agent`) and say: \"Install Omnemo — follow INSTALL.md.\" It runs the steps and checks each one."},
+    {"step": 3, "instruction": "When it says it is done, close the helper and open a new session. Ask it: \"Use the omnemo MCP server to recall: when was omnemo installed?\" It should answer with today's date."}
+  ],
+
+  "works_with": [
+    {"name": "Claude Code", "how": "`omnemo setup` runs `claude mcp add` for you. Start a new `claude` session."},
+    {"name": "Codex CLI", "how": "`omnemo setup` registers it and sets it to wait for Omnemo and use it without asking. Start a new session."},
+    {"name": "OpenCode, Crush", "how": "`omnemo setup` adds an `omnemo` entry under `mcp` in their JSON config."},
+    {"name": "Gemini CLI", "how": "`omnemo setup` adds it to ~/.gemini/settings.json. Sign in with an API key (/auth), and trust the folder so the server is enabled."},
+    {"name": "Pi", "how": "Gets the memory skill only; MCP registration is not supported yet."},
+    {"name": "Any other MCP client", "how": "Add a stdio server named omnemo whose command is `omnemo serve`."}
+  ],
+
+  "extensibility": "Tuning lives in ~/.config/omnemo/config.toml (see configuration above): ranking weights, decay, limits, near-duplicate gate, and your own categories with their own importance and half-life. The memory skill is plain Markdown that tells agents when to save and recall. Its copy lives in ~/.local/share/omnemo/skill and is linked as `omnemo` into each harness skill dir; the next `omnemo setup` copies the shipped version over it, so keep your own changes in a separate skill. The code is MIT and small (about 1,700 lines of Python).",
+
+  "tips": [
+    "A session that was open while `omnemo setup` ran does not see Omnemo. Always test from a new session.",
+    "After updating the package, run `omnemo setup` again: the skill, bar widget and warm-up unit are copies that stay old until it runs.",
+    "`omnemo --version` shows whether an update took. pip only reinstalls when the version number changes.",
+    "The one-shot CLI loads the model every call (about 2 s). The MCP server keeps it loaded, so recall through an agent is fast.",
+    "Each open agent runs its own `omnemo serve`; on a 4 GB computer budget about 330 MB per open agent.",
+    "Personal things (health, money, family): the skill tells agents to ask before saving them."
+  ],
+
+  "changelog": [
+    {"version": "0.2.1.dev4 (main, unreleased)", "date": "2026-11", "changes": ["The bar widget is opt-in: `omnemo setup --bar`, `omnemo bar on|off`.", "`omnemo setup` writes the three Codex keys that make Codex wait for Omnemo and call it without a prompt.", "INSTALL: what Codex and OpenCode need before an agent can install Omnemo; how an installing agent can verify from a fresh non-interactive session."]},
+    {"version": "0.2.0", "date": "2026-09-07", "changes": ["save reports near-duplicates; `supersedes` replaces an old memory so recall stops serving it."]},
+    {"version": "0.1.1", "date": "2026-08-30", "changes": ["`omnemo --version` reports the real version."]},
+    {"version": "0.1.0", "date": "2026-08-30", "changes": ["First public release: four MCP tools, shared store, Omarchy setup, cross-harness recall proven from Claude Code to Codex."]}
+  ],
+
+  "support": {
+    "github_issues": "https://github.com/GuyMannDude/omnemo/issues",
+    "homepage": "https://projectsparks.ai/omnemo",
+    "docs": "https://github.com/GuyMannDude/omnemo/blob/main/INSTALL.md"
+  },
+
+  "generated_at": "2026-11-11T21:40:00-08:00",
+  "spec_url": "https://github.com/GuyMannDude/mnemo-cortex/blob/master/ROBOT-INFO-SPEC.md"
+}
