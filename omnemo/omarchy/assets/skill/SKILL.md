@@ -88,7 +88,8 @@ where this one stopped.
 literal, case-insensitive text match, so the note is found every time. Search
 those exact words, or the note's exact opening such as "where we left off
 (band website)"; other words in the query make it miss. Use the result whose
-`superseded_by` is null (search also lists replaced notes), then `recall` the
+`superseded_by` is null (search also lists replaced notes; the shell marks
+them "(superseded by #N)"), then `recall` the
 task itself. If a left-off note comes back, start from it.
 
 **Close** — when the user wraps up, or a big piece of work lands:
@@ -99,7 +100,7 @@ task itself. If a left-off note comes back, start from it.
    current one, then save the new note with `supersedes=[its id]` so recall
    serves only the latest. If there is no current note yet, just save the
    new one. Start it with the words "Where we left off", then the project
-   in brackets ("Where we left off (band website): …"), save it as category
+   in round brackets, exactly like this: "Where we left off (band website): …", save it as category
    `fact` (not `transient`, which ranks too low to be found), and keep it to
    two or three sentences: what landed, what is next, what is waiting on
    the user.

@@ -91,7 +91,7 @@
     "robot_install_sh": null,
     "manual_docs": "https://github.com/GuyMannDude/omnemo/blob/main/INSTALL.md",
     "platforms": ["omarchy (Arch Linux)"],
-    "platform_note": "Built for Omarchy (INSTALL.md: Omarchy 2.0+, tested on 4.0.1, 4.0.4, 4.0.6 and 4.5). The memory server itself is plain Python; the setup steps (skill dirs, bar widget, harness registration) assume an Omarchy desktop.",
+    "platform_note": "Built for Omarchy (INSTALL.md: Omarchy 2.0+, tested on 4.0.1, 4.0.4 and 4.0.6; Omnemo OS installs it on 4.5 in its own test runs). The memory server itself is plain Python; the setup steps (skill dirs, bar widget, harness registration) assume an Omarchy desktop.",
     "runtime": "python>=3.11",
     "dependencies": ["mcp>=2", "fastembed>=0.8"],
     "agent_driven": "On Omarchy, pick a default agent (`omarchy default agent claude`), open it (`omarchy agent`) and say: \"Install Omnemo — follow INSTALL.md.\""
@@ -184,10 +184,10 @@
       "From the agent in a new session: recall when Omnemo was installed through the omnemo MCP server"
     ],
     "routine": [
-      "Open: search \"where we left off\" (a literal, case-insensitive text match: those exact words, or the note's exact opening such as \"where we left off (band website)\"; extra words make it miss). Use the result whose superseded_by is null, then recall the task itself",
+      "Open: search \"where we left off\" (a literal, case-insensitive text match: those exact words, or the note's exact opening such as \"where we left off (band website)\"; extra words make it miss). Use the result whose superseded_by is null, then recall the task itself. Several projects: search your project's exact opening instead",
       "Before building or diagnosing: recall it first. For a crash, recall the binary's name",
       "Save the why, when it happens: one fact per save, one or two sentences, category decision / fact / preference / incident. If save returns near_duplicates that this text replaces, pass their ids as supersedes",
-      "Close: save any unsaved decisions, then ONE note per project starting \"Where we left off (<project>):\", category fact, with supersedes=[the old note's id]. recall then serves only the new note; search still lists the old one, marked superseded_by",
+      "Close: save any unsaved decisions, then ONE note per project starting \"Where we left off (<project>):\", category fact, with supersedes=[the old note's id] (search that exact opening first to find it; if none, just save). recall then serves only the new note; search still lists the old one, marked superseded_by",
       "Wrong memory: search for it, confirm the id, forget <id> (deletes, no archive), and tell the user"
     ],
     "good_to_know": [

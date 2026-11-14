@@ -12,7 +12,7 @@ For an agent installing and using Omnemo. Each step was run once on a fresh inst
 
 1. Install: the four INSTALL.md step-1 lines (a venv in `~/.local/share/omnemo-venv`, pip install from GitHub, link `omnemo` into `~/.local/bin`), then `omnemo setup` with your human's yes. Test from a NEW session.
 2. Prove it: `omnemo save "Omnemo installed on this machine on $(date +%F)"`, `omnemo recall "when was omnemo installed"` returns it, `omnemo stats` counts it.
-3. Every session: open with `search "where we left off"` (literal text match: those exact words or the note's exact opening, nothing extra) and use the note whose `superseded_by` is null; `recall` before building anything; `save` each decision with its reason when it happens, one fact per save; close with ONE note per project, "Where we left off (<project>): …", category `fact`, `supersedes=[old id]`. The memory skill (`omnemo/omarchy/assets/skill/SKILL.md`) tells agents the same.
+3. Every session: open with `search "where we left off"` (literal text match: those exact words or the note's exact opening, nothing extra) and use the note whose `superseded_by` is null; `recall` before building anything; `save` each decision with its reason when it happens, one fact per save; close with ONE note per project, "Where we left off (<project>): …", category `fact`: `search` your project's exact opening first and pass that note's id as `supersedes=[id]`; no note yet, just save. With several projects, search your project's exact opening to open, too. The memory skill (`omnemo/omarchy/assets/skill/SKILL.md`) tells agents the same.
 
 ## Docs
 

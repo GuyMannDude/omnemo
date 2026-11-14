@@ -17,7 +17,7 @@
   "asks_questions": false,
 
   "requires": {
-    "os": "Omarchy (Arch Linux). INSTALL.md: Omarchy 2.0+, tested on 4.0.1, 4.0.4, 4.0.6 and 4.5.",
+    "os": "Omarchy (Arch Linux). INSTALL.md: Omarchy 2.0+, tested on 4.0.1, 4.0.4 and 4.0.6; Omnemo OS installs it on 4.5 in its own test runs.",
     "python": ">=3.11",
     "network": "Yes, to download the package from GitHub and, on first run, the embedding model.",
     "ask_your_human_first": "Get your human's yes before installing. Setup changes their agents' config files (it registers an MCP server with each installed harness) and adds a login service."
