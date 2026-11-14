@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **The memory skill's "where we left off" search now finds the note.**
+  `search` is a literal text match, but the skill told agents to add the
+  project name to the search words, which makes it miss every time. The
+  skill now says to search the exact words (or the note's exact opening),
+  to start each note with "Where we left off (<project>):", and that
+  `search` also lists replaced notes, so use the one whose `superseded_by`
+  is empty. Run `omnemo setup` after updating so the installed skill copy
+  picks it up. llms.txt and robot.info gain a short "getting the most out
+  of it" section for agents.
+
 - **The bar widget is opt-in (#1).** Ruling 2026-10-30: a user does not need
   a memory display, and the Omnemo OS edition leaves `omnemo.memory` off the
   bar. `omnemo setup` never edited the bar layout (it copies the plugin files

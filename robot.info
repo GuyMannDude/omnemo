@@ -172,6 +172,30 @@
     "Personal things (health, money, family): the skill tells agents to ask before saving them."
   ],
 
+  "getting_the_most_out_of_it": {
+    "install": [
+      "python3 -m venv ~/.local/share/omnemo-venv && ~/.local/share/omnemo-venv/bin/pip install git+https://github.com/GuyMannDude/omnemo && mkdir -p ~/.local/bin && ln -sf ~/.local/share/omnemo-venv/bin/omnemo ~/.local/bin/omnemo   (not pip install omnemo: PyPI is 0.1.1)",
+      "omnemo setup   (get your human's yes first: it registers the MCP server with each installed harness, links the memory skill, and enables a login service; every harness row must read ok)",
+      "Open a NEW agent session: one that was open during setup does not see Omnemo"
+    ],
+    "prove_it_works": [
+      "omnemo save \"Omnemo installed on this machine on $(date +%F)\", then omnemo recall \"when was omnemo installed\": the fact comes back",
+      "omnemo stats: memories 1 or more, learned today 1 or more",
+      "From the agent in a new session: recall when Omnemo was installed through the omnemo MCP server"
+    ],
+    "routine": [
+      "Open: search \"where we left off\" (a literal, case-insensitive text match: those exact words, or the note's exact opening such as \"where we left off (band website)\"; extra words make it miss). Use the result whose superseded_by is null, then recall the task itself",
+      "Before building or diagnosing: recall it first. For a crash, recall the binary's name",
+      "Save the why, when it happens: one fact per save, one or two sentences, category decision / fact / preference / incident. If save returns near_duplicates that this text replaces, pass their ids as supersedes",
+      "Close: save any unsaved decisions, then ONE note per project starting \"Where we left off (<project>):\", category fact, with supersedes=[the old note's id]. recall then serves only the new note; search still lists the old one, marked superseded_by",
+      "Wrong memory: search for it, confirm the id, forget <id> (deletes, no archive), and tell the user"
+    ],
+    "good_to_know": [
+      "The memory skill omnemo setup links into each harness says all of this to the agent: omnemo/omarchy/assets/skill/SKILL.md",
+      "Without MCP the same verbs work from the shell: omnemo save | recall | search | forget | stats"
+    ]
+  },
+
   "changelog": [
     {"version": "0.2.1.dev4 (main, unreleased)", "date": "2026-11", "changes": ["The bar widget is opt-in: `omnemo setup --bar`, `omnemo bar on|off`.", "`omnemo setup` writes the three Codex keys that make Codex wait for Omnemo and call it without a prompt.", "INSTALL: what Codex and OpenCode need before an agent can install Omnemo; how an installing agent can verify from a fresh non-interactive session."]},
     {"version": "0.2.0", "date": "2026-09-07", "changes": ["save reports near-duplicates; `supersedes` replaces an old memory so recall stops serving it."]},

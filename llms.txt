@@ -6,6 +6,14 @@ Omnemo is the memory core of Mnemo Cortex, cut down to just memory and fitted to
 
 Install from GitHub `main` by following INSTALL.md (no sudo, no prompts). The PyPI package `omnemo` is 0.1.1 and out of date: do not `pip install omnemo`. Before installing, get your human's yes: setup registers an MCP server in each installed agent's config and adds a login service. Main is 0.2.1.dev4; the last tagged release is v0.2.0.
 
+## Getting the most out of it
+
+For an agent installing and using Omnemo. Each step was run once on a fresh install; details in robot.info `getting_the_most_out_of_it`.
+
+1. Install: the four INSTALL.md step-1 lines (a venv in `~/.local/share/omnemo-venv`, pip install from GitHub, link `omnemo` into `~/.local/bin`), then `omnemo setup` with your human's yes. Test from a NEW session.
+2. Prove it: `omnemo save "Omnemo installed on this machine on $(date +%F)"`, `omnemo recall "when was omnemo installed"` returns it, `omnemo stats` counts it.
+3. Every session: open with `search "where we left off"` (literal text match: those exact words or the note's exact opening, nothing extra) and use the note whose `superseded_by` is null; `recall` before building anything; `save` each decision with its reason when it happens, one fact per save; close with ONE note per project, "Where we left off (<project>): …", category `fact`, `supersedes=[old id]`. The memory skill (`omnemo/omarchy/assets/skill/SKILL.md`) tells agents the same.
+
 ## Docs
 
 - [INSTALL.md](https://github.com/GuyMannDude/omnemo/blob/main/INSTALL.md): The install guide, for a person or an agent told "Install Omnemo — follow INSTALL.md". Every step ends with a check. Includes what Codex and OpenCode need first, update, and uninstall.
